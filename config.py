@@ -1,0 +1,55 @@
+"""
+config
+
+This module provides a configuration holder for the application. Each key can be
+overriden by setting an environment variable with the same name in uppercase.
+
+    import config
+    config.database_id
+
+Use a key before initializing will raise a RuntimeError
+
+    import config
+    config.database_id
+
+    RuntimeError: Config key database_id used before being set
+
+```
+
+"""
+
+import os
+from dataclasses import dataclass
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+@dataclass
+class ConfigHolder:
+    _env_prefix: str = ""
+    cache_dir: str = "cache"
+    log_level: str = "DEBUG"
+
+    def __init__(self):
+        """Initialize the configuration holder with environment variables"""
+        for attr_ in dir(self):
+            if not attr_.startswith("__"):
+                val = os.environ.get(f"{self._env_prefix}{attr_}".upper())
+                if val:
+                    setattr(self, attr_, val)
+
+        # use print because logger may not be setup properly
+        print(f"Config: {self}")
+
+
+_config_ = ConfigHolder()
+
+
+def __getattr__(key: str) -> str:
+    val = getattr(_config_, key, "")
+    if val:
+        return val
+    else:
+        raise RuntimeError(f"Config key {key} used before being set")
