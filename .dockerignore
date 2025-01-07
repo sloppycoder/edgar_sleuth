@@ -1,0 +1,12 @@
+# Ignore everything
+
+**
+
+# White-list what we need
+
+!entrypoint.sh
+!requirements*.txt
+!requirements*.lock
+!*.py
+!migrations/
+!edgar_sleuth

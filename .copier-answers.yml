@@ -1,0 +1,10 @@
+_commit: 0.3.0-1-gaba1ce8
+_src_path: git@github.com:vino9org/python-copier-template.git
+db_type: none
+pkg_name: edgar_sleuth
+project_name: edgar_sleuth
+project_type: simple
+use_devcontainer: false
+use_docker: true
+use_github_action: true
+version: 0.1.0
