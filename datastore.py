@@ -19,7 +19,7 @@ def _gen_create_statement(table_name: str, dimension: int = 0) -> str:
             chunk_text TEXT NOT NULL,
             tags TEXT[])
         """
-    if table_name.startswith("filing_chunks_embeddings"):
+    elif table_name.startswith("filing_chunks_embeddings"):
         return f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
             cik VARCHAR(10) NOT NULL,
