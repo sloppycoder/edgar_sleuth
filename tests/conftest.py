@@ -11,14 +11,14 @@ config.setv("cache_path", cache_path)
 
 
 @pytest.fixture(scope="session")
-def clean_db(database_url):
-    if "_test" not in database_url:
+def clean_db():
+    if "_test" not in config.database_url:
         print("Not a test database, skipping cleanup")
         return
 
     try:
         # Connect to the database
-        with psycopg.connect(database_url) as conn:
+        with psycopg.connect(config.database_url) as conn:
             with conn.cursor() as cur:
                 # Fetch all table names in the 'public' schema
                 cur.execute("""
