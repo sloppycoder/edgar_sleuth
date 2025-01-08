@@ -29,7 +29,7 @@ load_dotenv()
 @dataclass
 class ConfigHolder:
     _env_prefix: str = ""
-    cache_dir: str = "cache"
+    cache_path: str = "cache"
     log_level: str = "DEBUG"
 
     def __init__(self):
@@ -53,3 +53,12 @@ def __getattr__(key: str) -> str:
         return val
     else:
         raise RuntimeError(f"Config key {key} used before being set")
+
+
+# use a funciton because overriding __setattr__ is not allowed
+def setv(key: str, value: str) -> None:
+    attrs = [f for f in dir(_config_) if not f.startswith("__")]
+    if key in attrs:
+        setattr(_config_, key, str(value))
+    else:
+        raise RuntimeError(f"Config key {key} is not allowed")

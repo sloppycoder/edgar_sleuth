@@ -8,7 +8,7 @@ import click
 
 logger = logging.getLogger(__name__)
 
-logger_config_path = Path(__file__).parent.parent / "logger_config.json"
+logger_config_path = Path.cwd() / "logger_config.json"
 if logger_config_path.exists():
     with open(logger_config_path, "r") as f:
         logging.config.dictConfig(json.load(f))

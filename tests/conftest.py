@@ -1,5 +1,6 @@
-import logging
+from pathlib import Path
 
-# suppress INFO logs to reduce noise in test output
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.WARN)
+import config
+
+cache_path = str(Path(__file__).parent / "data/cache")
+config.setv("cache_path", cache_path)

@@ -6,8 +6,10 @@ authors = [{ name = "Li Lin", email = "guru.lin@gmail.com" }]
 readme = "README.md"
 requires-python = ">= 3.12"
 dependencies = [
+    "beautifulsoup4>=4.12.3",
     "click>=8.1.8",
     "python-dotenv>=1.0.1",
+    "requests>=2.32.3",
 ]
 [dependency-groups]
 dev = [
