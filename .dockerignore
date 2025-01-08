@@ -8,5 +8,8 @@
 !requirements*.txt
 !requirements*.lock
 !*.py
-!migrations/
-!edgar_sleuth
+!edgar_sleuth/
+!edgar/
+!llm/
+!splitter/
+!datastore/
