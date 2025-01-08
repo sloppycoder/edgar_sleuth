@@ -31,6 +31,7 @@ class ConfigHolder:
     _env_prefix: str = ""
     cache_path: str = "cache"
     log_level: str = "DEBUG"
+    database_url: str = ""
 
     def __init__(self):
         """Initialize the configuration holder with environment variables"""

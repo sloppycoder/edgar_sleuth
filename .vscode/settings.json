@@ -14,4 +14,20 @@
         "editor.defaultFormatter": "charliermarsh.ruff"
     },
     "debugpy.debugJustMyCode": false,
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "driver": "PostgreSQL",
+            "name": "local_edgar",
+            "connectString": "postgresql://@/edgar"
+        },
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "driver": "PostgreSQL",
+            "name": "local_test",
+            "connectString": "postgresql://@/edgar_test"
+        }
+    ],
 }

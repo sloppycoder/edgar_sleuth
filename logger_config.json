@@ -26,7 +26,21 @@
             "handlers": [
                 "console"
             ],
-            "level": "INFO",
+            "level": "DEBUG",
+            "propagate": true
+        },
+        "edgar": {
+            "handlers": [
+                "console"
+            ],
+            "level": "DEBUG",
+            "propagate": true
+        },
+        "splitter": {
+            "handlers": [
+                "console"
+            ],
+            "level": "DEBUG",
             "propagate": true
         }
     }

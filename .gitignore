@@ -22,5 +22,8 @@ pytest_junit.xml
 .cdk.staging
 cdk.out
 
-#
+# local stuff
+cache/
+
+# cloud credential
 edgar-*.json

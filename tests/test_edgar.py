@@ -1,4 +1,9 @@
-from edgar import SECFiling, _index_html_path, edgar_file, idx_filename2accession_number
+from edgar import (
+    SECFiling,
+    _index_html_path,
+    edgar_file,
+    idx_filename2accession_number,
+)
 
 
 def test_idx_filename2index_html_path():
