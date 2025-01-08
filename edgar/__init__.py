@@ -50,7 +50,7 @@ class InvalidFilingExceptin(Exception):
 
 class SECFiling:
     def __init__(
-        self, cik: str = "", accession_numbrer: str = "", idx_filename: str = ""
+        self, cik: str = "", accession_number: str = "", idx_filename: str = ""
     ) -> None:
         # sometimes a same filename is used by several CIKs
         # filename as in master.idx
@@ -60,9 +60,9 @@ class SECFiling:
             self.idx_filename = idx_filename
             self.cik, self.accession_number = parse_idx_filename(idx_filename)
         else:
-            if cik and accession_numbrer:
-                self.cik, self.accession_number = cik, accession_numbrer
-                self.idx_filename = f"edgar/data/{self.cik}/{self.accession_number}.txt"
+            if cik and accession_number:
+                self.cik, self.accession_number = cik, accession_number
+                self.idx_filename = f"edgar/data/{cik}/{accession_number}.txt"
             else:
                 raise ValueError(
                     "cik and accession_number must be specified when idx_filename is not"
@@ -74,10 +74,10 @@ class SECFiling:
             "-index.html", "-index-headers.html"
         )
 
-        (self.sec_header, self.date_filed, self.documents) = self._read_index_headers()
+        (self._sec_header, self.date_filed, self.documents) = self._read_index_headers()
         logger.debug(f"initialized SECFiling({self.cik},{self.idx_filename})")
 
-    def get_doc_by_type(self, doc_type: str) -> list[str]:
+    def get_doc_path(self, doc_type: str) -> list[str]:
         """
         Reads the contents of documents of a specific type from the filing.
 
@@ -104,6 +104,16 @@ class SECFiling:
             )
 
         return [str(Path(self.index_headers_path).parent / path) for path in paths]
+
+    def get_doc_content(self, doc_type: str, max_items: int = 1) -> list[tuple[str, str]]:
+        result = []
+        for doc_path in self.get_doc_path(doc_type):
+            content = edgar_file(doc_path)
+            if content:
+                result.append((doc_path, content))
+                if len(result) >= max_items:
+                    break
+        return result
 
     def _read_index_headers(self) -> tuple[str, str, list[dict[str, Any]]]:
         """read the index-headers.html file and extract the sec_header and documents"""
@@ -149,6 +159,9 @@ class SECFiling:
         logger.info(f"No sec-header found in {self.index_headers_path}")
 
         return "", "", []
+
+    def __str__(self):
+        return f"SECFiling({self.cik},{self.accession_number},{self.date_filed},docs={len(self.documents)}"  # noqa E501
 
 
 def parse_idx_filename(idx_filename: str) -> tuple[str, str]:
