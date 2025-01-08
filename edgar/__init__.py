@@ -49,15 +49,27 @@ class InvalidFilingExceptin(Exception):
 
 
 class SECFiling:
-    def __init__(self, cik: str, idx_filename: str):
+    def __init__(
+        self, cik: str = "", accession_numbrer: str = "", idx_filename: str = ""
+    ) -> None:
         # sometimes a same filename is used by several CIKs
         # filename as in master.idx
         # e.g. edgar/data/106830/0001683863-20-000050.txt
-        self.cik = cik
-        self.idx_filename = idx_filename
-        self.accession_number = idx_filename2accession_number(idx_filename)
+        # if filename is specified, we derive cik and accession_number from it
+        if idx_filename:
+            self.idx_filename = idx_filename
+            self.cik, self.accession_number = parse_idx_filename(idx_filename)
+        else:
+            if cik and accession_numbrer:
+                self.cik, self.accession_number = cik, accession_numbrer
+                self.idx_filename = f"edgar/data/{self.cik}/{self.accession_number}.txt"
+            else:
+                raise ValueError(
+                    "cik and accession_number must be specified when idx_filename is not"
+                )
+
         # idx filename for the filing index-headers file
-        self.index_html_path = _index_html_path(idx_filename)
+        self.index_html_path = _index_html_path(self.idx_filename)
         self.index_headers_path = self.index_html_path.replace(
             "-index.html", "-index-headers.html"
         )
@@ -139,14 +151,12 @@ class SECFiling:
         return "", "", []
 
 
-def idx_filename2accession_number(idx_filename: str) -> str:
-    accession_number = ""
-    if idx_filename.endswith(".txt"):
-        accession_number = idx_filename.split("/")[-1].split(".")[0]
-    elif idx_filename.endswith(".htm"):
-        part = idx_filename.split("/")[-2]
-        accession_number = f"{part[:10]}-{part[10:12]}-{part[12:]}"
-    return accession_number
+def parse_idx_filename(idx_filename: str) -> tuple[str, str]:
+    "Determine CIK and Accession Number from index filename"
+    match = re.search(r"edgar/data/(\d+)/(.+)\.txt", idx_filename)
+    if match:
+        return match.group(1), match.group(2)
+    raise ValueError(f"parse_idx_filename: {idx_filename} is of an unexpected format")
 
 
 def edgar_file(idx_filename: str, cached_only: bool = False) -> str | None:

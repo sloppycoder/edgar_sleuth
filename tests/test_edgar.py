@@ -1,8 +1,10 @@
+import pytest
+
 from edgar import (
     SECFiling,
     _index_html_path,
     edgar_file,
-    idx_filename2accession_number,
+    parse_idx_filename,
 )
 
 
@@ -23,17 +25,16 @@ def test_edgar_file():
     assert dummy_file_2 is None
 
 
-def test_filename2accession_number():
-    assert "0001193125-20-000327" == idx_filename2accession_number(
+def test_parse_idx_filename():
+    assert ("1035018", "0001193125-20-000327") == parse_idx_filename(
         "edgar/data/1035018/0001193125-20-000327.txt"
     )
-    assert "0001193125-20-000327" == idx_filename2accession_number(
-        "edgar/data/1035018/000119312520000327/somestuff_485bpos.htm"
-    )
+    with pytest.raises(ValueError, match="an unexpected format"):
+        parse_idx_filename("edgar/data/blah.txt")
 
 
 def test_parse_485bpos_filing():
-    filing = SECFiling("1002427", "edgar/data/1002427/0001133228-24-004879.txt")
+    filing = SECFiling(idx_filename="edgar/data/1002427/0001133228-24-004879.txt")
     filing_html_path = filing.get_doc_by_type("485BPOS")[0]
     contents = edgar_file(filing_html_path)
 
