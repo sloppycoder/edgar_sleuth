@@ -9,11 +9,15 @@ dependencies = [
     "beautifulsoup4>=4.12.3",
     "click>=8.1.8",
     "en-core-web-sm",
+    "google-cloud-aiplatform>=1.76.0",
     "html2text>=2024.2.26",
+    "openai>=1.59.4",
     "psycopg>=3.2.3",
     "python-dotenv>=1.0.1",
     "requests>=2.32.3",
     "spacy>=3.8.3",
+    "tenacity>=9.0.0",
+    "tiktoken>=0.8.0",
 ]
 [dependency-groups]
 dev = [
