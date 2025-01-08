@@ -161,7 +161,7 @@ class SECFiling:
         return "", "", []
 
     def __str__(self):
-        return f"SECFiling({self.cik},{self.accession_number},{self.date_filed},docs={len(self.documents)}"  # noqa E501
+        return f"SECFiling({self.cik},{self.accession_number},{self.date_filed},docs={len(self.documents)})"  # noqa E501
 
 
 def parse_idx_filename(idx_filename: str) -> tuple[str, str]:

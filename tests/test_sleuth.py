@@ -10,7 +10,6 @@ def test_chunk_and_embedding_filing(clean_db):
     n_chunks = chunk_filing(
         filing,
         form_type="485BPOS",
-        dryrun=False,
         tags=tags,
         table_name="filing_text_chunks",
     )
@@ -20,7 +19,6 @@ def test_chunk_and_embedding_filing(clean_db):
         text_table_name="filing_text_chunks",
         cik=filing.cik,
         accession_number=filing.accession_number,
-        dryrun=False,
         tags=tags,
         embedding_table_name="filing_text_embeddings",
     )

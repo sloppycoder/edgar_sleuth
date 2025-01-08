@@ -14,14 +14,10 @@ logger = logging.getLogger(__name__)
 def chunk_filing(
     filing: SECFiling,
     form_type: str,
-    dryrun: bool = False,
     method: str = "spacy",
     tags: list[str] = [],
-    table_name: str = "",
+    table_name: str = "",  # leave empty if dryrun
 ) -> int:
-    if not table_name and not dryrun:
-        raise ValueError("table_name is required if not in dryrun mode")
-
     logging.debug(f"chunk_filing form {form_type} of {filing}")
 
     if filing:
@@ -35,7 +31,7 @@ def chunk_filing(
         )
 
         if len(chunks) > 1:
-            if not dryrun:
+            if table_name:
                 logger.debug(f"Saving {len(chunks)} text chunks to {table_name}")
                 save_chunks(
                     cik="1035018",
@@ -56,12 +52,8 @@ def get_embeddings(
     accession_number: str,
     tags: list[str] = [],
     model: str = GEMINI_EMBEDDING_MODEL,
-    dryrun: bool = False,
     embedding_table_name: str = "",
 ) -> int:
-    if not embedding_table_name and not dryrun:
-        raise ValueError("embedding_table_name is required if not in dryrun mode")
-
     text_chunks_records = get_chunks(
         cik=cik,
         accession_number=accession_number,
@@ -76,14 +68,13 @@ def get_embeddings(
     )
 
     if len(embeddings) > 1:
-        if not dryrun:
-            table_name = "filing_chunks_embeddings"
-            logger.debug(f"Saving {len(chunks)} embeddings to {table_name}")
+        if embedding_table_name:
+            logger.debug(f"Saving {len(chunks)} embeddings to {embedding_table_name}")
             save_chunks(
                 cik=cik,
                 accession_number=accession_number,
                 chunks=embeddings,
-                table_name=table_name,
+                table_name=embedding_table_name,
                 tags=tags,
                 create_table=True,
                 dimension=len(embeddings[0]),
