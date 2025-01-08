@@ -42,6 +42,20 @@
             ],
             "level": "DEBUG",
             "propagate": true
+        },
+        "llm": {
+            "handlers": [
+                "console"
+            ],
+            "level": "DEBUG",
+            "propagate": true
+        },
+        "datastore": {
+            "handlers": [
+                "console"
+            ],
+            "level": "DEBUG",
+            "propagate": true
         }
     }
 }

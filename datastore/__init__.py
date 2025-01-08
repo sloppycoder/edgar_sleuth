@@ -1,5 +1,6 @@
 import logging
 from functools import lru_cache
+from typing import Any
 
 import psycopg
 
@@ -83,7 +84,23 @@ def save_chunks(
     _conn().commit()
 
 
-def execute_query(query, params=None):
+def get_chunks(
+    cik: str, accession_number: str, table_name: str, tags: list[str] = []
+) -> list[dict[str, Any]]:
+    col = "embeddings" if "embedding" in table_name else "chunk_text"
+
+    results = execute_query(
+        f"""
+        SELECT cik, accession_number, chunk_number, {col}
+        FROM {table_name}
+        WHERE cik = %s AND accession_number = %s
+    """,
+        (cik, accession_number),
+    )
+    return results
+
+
+def execute_query(query, params=None) -> list[dict[str, Any]]:
     result = []
     try:
         with _conn().cursor() as cur:

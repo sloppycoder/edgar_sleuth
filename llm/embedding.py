@@ -2,8 +2,9 @@ import httpx
 import tiktoken
 from google.api_core.exceptions import GoogleAPICallError, ServerError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
-from util import init_vertaxai, openai_client
 from vertexai.language_models import TextEmbeddingInput, TextEmbeddingModel
+
+from .util import init_vertaxai, openai_client
 
 # models used for embeddings
 OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
@@ -121,7 +122,7 @@ def _call_gemini_embedding_api(
         inputs = [TextEmbeddingInput(text, task_type=task_type) for text in content]
         embeddings = embedding_model.get_embeddings(
             texts=inputs,  # pyright: ignore
-            auto_truncate=False,
+            auto_truncate=True,
         )
         return [e.values for e in embeddings]
     except GoogleAPICallError as e:
