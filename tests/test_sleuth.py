@@ -20,6 +20,6 @@ def test_chunk_and_embedding_filing(clean_db):
         cik=filing.cik,
         accession_number=filing.accession_number,
         tags=tags,
-        embedding_table_name="filing_text_embeddings",
+        embedding_table_name="filing_chunks_embeddings",
     )
     assert n_embeddings == n_chunks
