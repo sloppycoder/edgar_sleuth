@@ -94,10 +94,10 @@ def main(
 ) -> None:
     # hard coded values for now
     text_table_name = "filing_text_chunks"
-    embedding_table_name = "filing_text_embeddings"
+    embedding_table_name = "filing_chunks_embeddings"
     form_type = "485BPOS"
 
-    tags = tags.split(",") if tags else []  # pyright: ignore
+    data_tags = tags.split(",") if tags else []
 
     n_errors = 0
 
@@ -114,7 +114,7 @@ def main(
             n_chunks = chunk_filing(
                 filing=filing,
                 form_type=form_type,
-                tags=tags,
+                tags=data_tags,
                 table_name=text_table_name,
             )
             if n_chunks > 1:
@@ -130,7 +130,7 @@ def main(
                 text_table_name=text_table_name,
                 cik=filing.cik,
                 accession_number=filing.accession_number,
-                tags=tags,
+                tags=data_tags,
                 embedding_table_name=embedding_table_name,
             )
             if n_chunks > 1:
