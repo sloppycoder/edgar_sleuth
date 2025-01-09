@@ -7,14 +7,12 @@ overriden by setting an environment variable with the same name in uppercase.
     import config
     config.database_id
 
-Use a key before initializing will raise a RuntimeError
+Use a key before initializing will get a warning message
 
     import config
     config.database_id
 
-    RuntimeError: Config key database_id used before being set
-
-```
+    WARN: Config key database_id used before being set
 
 """
 
@@ -41,9 +39,6 @@ class ConfigHolder:
                 if val:
                     setattr(self, attr_, val)
 
-        # use print because logger may not be setup properly
-        print(f"Config: {self}")
-
 
 _config_ = ConfigHolder()
 
@@ -53,7 +48,8 @@ def __getattr__(key: str) -> str:
     if val:
         return val
     else:
-        raise RuntimeError(f"Config key {key} used before being set")
+        print(f"WARN: Config key {key} used before being set")
+        return ""
 
 
 # use a funciton because overriding __setattr__ is not allowed
