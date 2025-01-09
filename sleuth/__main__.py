@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Iterator
 
 import click
+import yaml
 
 from . import chunk_filing, get_embeddings
 from .datastore import execute_query
@@ -17,10 +18,10 @@ MAX_ERRORS = 5
 
 logger = logging.getLogger(__name__)
 
-logger_config_path = Path.cwd() / "logger_config.json"
+logger_config_path = Path.cwd() / "logger_config.yaml"
 if logger_config_path.exists():
     with open(logger_config_path, "r") as f:
-        logging.config.dictConfig(json.load(f))
+        logging.config.dictConfig(yaml.safe_load(f))
 
 
 def create_filing(
