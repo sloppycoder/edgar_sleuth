@@ -7,6 +7,7 @@ from typing import Iterator
 
 import click
 
+from datastore import execute_query
 from edgar import SECFiling
 from edgar_sleuth.trustee import create_search_phrase_embeddings, extract_trustee_comp
 from llm.embedding import GEMINI_EMBEDDING_MODEL
@@ -63,7 +64,9 @@ def enumerate_filings(batch: str) -> Iterator[SECFiling]:
 @click.command()
 @click.argument(
     "action",
-    type=click.Choice(["init", "chunk", "embed", "extract"], case_sensitive=False),
+    type=click.Choice(
+        ["initdb", "init", "chunk", "embed", "extract"], case_sensitive=False
+    ),
 )
 @click.option(
     "--full",
@@ -102,7 +105,19 @@ def main(
     search_phrase_tag = "gemini_768"
     form_type = "485BPOS"
 
-    if action == "init":
+    answer = "no"
+    if action == "initdb":
+        answer = input("This will drop all tables, are you sure? (yes/no): ")
+        if answer.lower() == "yes":
+            for table_name in [
+                text_table_name,
+                embedding_table_name,
+                search_phrase_table_name,
+            ]:
+                print(f"Dropping table {table_name}")
+                execute_query(f"DROP TABLE IF EXISTS {table_name}")
+
+    if action == "init" or (action == "initdb" and answer.lower() == "yes"):
         print("Initializing search phrase embeddings...")
         create_search_phrase_embeddings(
             search_phrase_table_name,
