@@ -1,6 +1,3 @@
-import json
-import logging
-import logging.config
 import os
 from pathlib import Path
 
@@ -11,11 +8,6 @@ import config
 
 cache_path = str(Path(__file__).parent / "data/cache")
 config.setv("cache_path", cache_path)
-
-logger_config_path = Path(__file__).parent.parent / "logger_config.json"
-if logger_config_path.exists():
-    with open(logger_config_path, "r") as f:
-        logging.config.dictConfig(json.load(f))
 
 
 @pytest.fixture(scope="session")
@@ -39,7 +31,6 @@ def clean_db():
                 # Drop each table
                 for table in tables:
                     table_name = table[0]
-                    print(f"Dropping table: {table_name}")
                     cur.execute(f"DROP TABLE IF EXISTS {table_name} CASCADE;")  # pyright: ignore
                 conn.commit()
     except Exception as e:

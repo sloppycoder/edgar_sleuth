@@ -4,7 +4,7 @@ import html2text
 import spacy
 from bs4 import BeautifulSoup
 
-from edgar import edgar_file
+from .edgar import edgar_file
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@
             "name": "Python: Current File",
             "type": "debugpy",
             "request": "launch",
-            "module": "edgar_sleuth",
+            "module": "sleuth",
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [

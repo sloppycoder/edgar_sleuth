@@ -1,5 +1,5 @@
-from edgar import SECFiling
-from splitter import chunk_text, default_text_converter
+from sleuth.edgar import SECFiling
+from sleuth.splitter import chunk_text, default_text_converter
 
 
 def test_chunk_filing():

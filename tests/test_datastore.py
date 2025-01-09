@@ -1,6 +1,6 @@
 import random
 
-from datastore import execute_query, initialize_search_phrases, save_chunks
+from sleuth.datastore import execute_query, initialize_search_phrases, save_chunks
 
 
 def test_execute_query():

@@ -1,9 +1,13 @@
 import logging
 
-from datastore import execute_query, initialize_search_phrases
-from llm.algo import gather_chunk_distances, most_relevant_chunks, relevance_by_distance
-from llm.embedding import batch_embedding
-from llm.extraction import ask_model, extract_json_from_response
+from .datastore import execute_query, initialize_search_phrases
+from .llm.algo import (
+    gather_chunk_distances,
+    most_relevant_chunks,
+    relevance_by_distance,
+)
+from .llm.embedding import batch_embedding
+from .llm.extraction import ask_model, extract_json_from_response
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 import pytest
 
-from edgar import (
+from sleuth.edgar import (
     SECFiling,
     _index_html_path,
     edgar_file,

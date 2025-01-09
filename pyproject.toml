@@ -19,6 +19,14 @@ dependencies = [
     "tenacity>=9.0.0",
     "tiktoken>=0.8.0",
 ]
+
+[tool.setuptools]
+packages = ["sleuth", "sleuth.llm"]
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [dependency-groups]
 dev = [
     "pytest >= 8.3.0",

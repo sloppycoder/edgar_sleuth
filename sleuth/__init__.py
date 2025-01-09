@@ -1,10 +1,10 @@
 import logging
 from datetime import datetime
 
-from datastore import get_chunks, save_chunks
-from edgar import SECFiling
-from llm.embedding import GEMINI_EMBEDDING_MODEL, batch_embedding
-from splitter import chunk_text, default_text_converter
+from .datastore import get_chunks, save_chunks
+from .edgar import SECFiling
+from .llm.embedding import GEMINI_EMBEDDING_MODEL, batch_embedding
+from .splitter import chunk_text, default_text_converter
 
 __version__ = "0.1.0"
 

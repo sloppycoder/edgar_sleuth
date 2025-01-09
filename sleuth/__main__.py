@@ -7,12 +7,11 @@ from typing import Iterator
 
 import click
 
-from datastore import execute_query
-from edgar import SECFiling
-from edgar_sleuth.trustee import create_search_phrase_embeddings, extract_trustee_comp
-from llm.embedding import GEMINI_EMBEDDING_MODEL
-
 from . import chunk_filing, get_embeddings
+from .datastore import execute_query
+from .edgar import SECFiling
+from .llm.embedding import GEMINI_EMBEDDING_MODEL
+from .trustee import create_search_phrase_embeddings, extract_trustee_comp
 
 MAX_ERRORS = 5
 
@@ -65,7 +64,7 @@ def enumerate_filings(batch: str) -> Iterator[SECFiling]:
 @click.argument(
     "action",
     type=click.Choice(
-        ["initdb", "init", "chunk", "embed", "extract"], case_sensitive=False
+        ["initdb", "init", "chunk", "embedding", "extract"], case_sensitive=False
     ),
 )
 @click.option(
@@ -126,7 +125,7 @@ def main(
         )
         return
 
-    elif action not in ["chunk", "embed", "extract"]:
+    elif action not in ["chunk", "embedding", "extract"]:
         print(f"Unknown action {action}")
         return
 
@@ -141,7 +140,7 @@ def main(
             print(f"Aborting after reaching max errors: {MAX_ERRORS}")
             break
 
-        if action == "chunk" or (action in ["extract", "embed"] and full):
+        if action == "chunk" or (action in ["extract", "embedding"] and full):
             n_chunks = chunk_filing(
                 filing=filing,
                 form_type=form_type,
@@ -191,9 +190,6 @@ def main(
             logger.debug(f"{model} response:{response}")
             n_trustees = len(comp_info["trustees"]) if comp_info else 0
             print(f"Extracted {n_trustees} from {filing}")
-
-        else:
-            print(f"Unknown action {action}")
 
 
 if __name__ == "__main__":

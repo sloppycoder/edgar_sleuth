@@ -2,13 +2,13 @@ import os
 
 import pytest
 
-from edgar import SECFiling
-from edgar_sleuth import chunk_filing, get_embeddings
-from edgar_sleuth.trustee import (
+from sleuth import chunk_filing, get_embeddings
+from sleuth.edgar import SECFiling
+from sleuth.llm.embedding import GEMINI_EMBEDDING_MODEL
+from sleuth.trustee import (
     create_search_phrase_embeddings,
     extract_trustee_comp,
 )
-from llm.embedding import GEMINI_EMBEDDING_MODEL
 
 run_models = os.environ.get("PYTEST_RUN_MODELS", "0") == "1"
 
