@@ -220,7 +220,7 @@ def _download_file(
         os.makedirs(output_path.parent, exist_ok=True)
         with open(output_path, "wb") as file:
             file.write(response.content)
-        logger.debug("Downloaded {url} and saved to {localPath}")
+        logger.debug(f"Downloaded {url} and saved to {output_path}")
         return True
     else:
         # TODO: add retrying logic and etc to make it more robust
