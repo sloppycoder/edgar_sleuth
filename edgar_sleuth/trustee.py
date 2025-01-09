@@ -1,7 +1,9 @@
 import logging
 
 from datastore import execute_query
+from llm.algo import gather_chunk_distances, most_relevant_chunks, relevance_by_distance
 from llm.embedding import GEMINI_EMBEDDING_MODEL, batch_embedding
+from llm.extraction import ask_model, extract_json_from_response
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +15,62 @@ TRUSTEE_COMP_SEARCH_PHRASES = [
 ]
 
 
-def create_search_phrases_embeddings(table_name: str, tags: list[str] = []) -> None:
-    tags = tags or ["gemini-768"]
+TRUSTEE_COMP_PROMPT = """
+You are tasked with extracting compensation information for Trustees from a snippet
+of an SEC filing 485BPOS. Here is the snippet you need to analyze:
 
+<sec_filing_snippet>
+{SEC_FILING_SNIPPET}
+</sec_filing_snippet>
+
+Your task is to extract the following information:
+1. Determine if compensation information for Trustees is present in the snippet.
+2. If present, extract the compensation details for each Trustee, including their name, job title, fund compensation, fund group compensation, and deferred compensation.
+3. Note any additional types of compensation mentioned in the document.
+
+Follow these steps to analyze the snippet:
+1. Carefully read through the entire snippet.
+2. Look for a table or section that contains compensation information for Trustees, Board Members, Board Directors, or Interested Persons.
+3. If you find such information, extract the relevant details for each Trustee.
+4. Pay attention to any footnotes or additional explanations related to the compensation.
+
+Structure your output as follows:
+1. A boolean field indicating whether compensation information is present in the snippet.
+2. A list of Trustees with their compensation details.
+3. A notes field for any additional information or explanations.
+
+If the compensation information is not present in the snippet:
+1. Set the boolean field to false.
+2. Leave the list of Trustees empty.
+3. In the notes field, explain that the compensation information was not found in the given snippet.
+
+If you find any additional relevant information or need to provide explanations about your analysis,
+include them in the notes field.
+
+Provide your output in JSON format, as showsn in example below
+
+{
+ "compensation_info_present": true/false,
+ "trustees": [
+  {
+   "year": "Year of Compensation",
+   "name": "name of the trustee or N/A",
+   "job_title": "the job title of the person who is a trustee. e.g. Commitee Chairperson",
+   "fund_compensation": "Amount or N/A",
+   "fund_group_compensation": "Amount or N/A",
+   "deferred_compensation": "Amount or N/A",
+   "other_compensation": {
+    "type": "Amount"
+   }
+  }
+ ],
+ "notes": "Any additional information or explanations"
+}
+Please remove the leading $ sign and comma from compensation Amount.
+"""  # noqa: E501
+
+
+def create_search_phrases_embeddings(table_name: str, tags: list[str] = []) -> None:
     embeddings = batch_embedding(
         TRUSTEE_COMP_SEARCH_PHRASES,
         GEMINI_EMBEDDING_MODEL,
@@ -39,3 +94,92 @@ def create_search_phrases_embeddings(table_name: str, tags: list[str] = []) -> N
             f"INSERT INTO {table_name} (phrase, phrase_embedding, tags) VALUES (%s, %s, %s)",  # noqa: E501
             (phrase, embeddings[n], tags),
         )
+
+
+def get_relevant_chunks_with_distances(
+    cik: str,
+    accession_number: str,
+    embedding_table_name: str,
+    search_phrase_table_name: str,
+):
+    # limit 12 is like top_k =3 for 4 search phrases
+    result = execute_query(
+        f"""
+        SELECT
+            cik, accession_number, phrase, chunk_num,
+            embedding <=> phrase_embedding as distance
+        FROM
+            {search_phrase_table_name} p,
+            {embedding_table_name} e
+            where
+               cik = %s and accession_number = %s
+            order by
+                embedding <=> phrase_embedding
+            limit 12;
+    """,
+        (cik, accession_number),
+    )
+    return result
+
+
+def get_text_by_chunk_num(
+    text_table_name: str,
+    cik: str,
+    accession_number: str,
+    chunk_nums: list[int],
+) -> str:
+    result = execute_query(
+        f"""
+        SELECT
+            STRING_AGG(chunk_text, '\n' ORDER BY chunk_num) as relevant_text
+        FROM
+            {text_table_name}
+        WHERE
+            cik = %s
+            AND accession_number = %s
+            AND chunk_num = ANY(%s)
+    """,
+        (cik, accession_number, chunk_nums),
+    )
+    if result:
+        return result[0]["relevant_text"]
+    else:
+        return ""
+
+
+def find_relevant_text(
+    cik: str,
+    accession_number: str,
+    text_table_name: str,
+    embedding_table_name: str,
+    search_phrase_table_name: str,
+) -> str:
+    relevance_result = get_relevant_chunks_with_distances(
+        cik=cik,
+        accession_number=accession_number,
+        embedding_table_name=embedding_table_name,
+        search_phrase_table_name=search_phrase_table_name,
+    )
+
+    chunk_distances = gather_chunk_distances(relevance_result)
+    relevance_scores = relevance_by_distance(chunk_distances)
+    selected_chunks = [int(s) for s in most_relevant_chunks(relevance_scores)]
+    relevant_text = get_text_by_chunk_num(
+        cik=cik,
+        accession_number=accession_number,
+        chunk_nums=selected_chunks,
+        text_table_name=text_table_name,
+    )
+    if relevant_text and len(relevant_text) > 100:
+        return relevant_text
+    else:
+        return ""
+
+
+def ask_model_about_trustee_comp(model: str, relevant_text: str):
+    prompt = TRUSTEE_COMP_PROMPT.replace("{SEC_FILING_SNIPPET}", relevant_text)
+    response = ask_model(model, prompt)
+    if response:
+        comp_info = extract_json_from_response(response)
+        return response, comp_info
+    return None, None

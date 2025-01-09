@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any, Optional
 
@@ -54,5 +55,17 @@ def chat_with_gemini(model_name: str, prompt: str) -> Optional[str]:
 
 
 def extract_json_from_response(response: str) -> dict[str, Any]:
-    # Extracts JSON data from the response string
-    return {"something": 123}
+    # the response should be a JSON
+    # sometimes Gemini wraps it in a markdown block ```json ...```
+    # so we unrap the markdown block and get to the json
+    if len(response) > 10:
+        start_markdown_index = response.find("```json")
+        end_markdown__index = response.rfind("```")
+        if start_markdown_index >= 0 and end_markdown__index >= 0:
+            try:
+                return json.loads(
+                    response[start_markdown_index + 7 : end_markdown__index]
+                )
+            except json.JSONDecodeError:
+                logger.warning("Failed to parse JSON from response")
+    return {}

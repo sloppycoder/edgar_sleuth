@@ -119,3 +119,15 @@ def relevance_by_appearance(chunk_distances):
     # Sort by score in descending order
     relevance_scores.sort(key=lambda x: x[3], reverse=True)
     return relevance_scores
+
+
+def gather_chunk_distances(results: list[dict]) -> dict:
+    chunk_distances = {}
+    for row in results:
+        chunk_num = row["chunk_num"]
+        distance = row["distance"]
+        if chunk_num not in chunk_distances:
+            chunk_distances[chunk_num] = []
+        chunk_distances[chunk_num].append(distance)
+
+    return chunk_distances
