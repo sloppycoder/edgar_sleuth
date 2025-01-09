@@ -18,7 +18,7 @@ def chunk_filing(
     tags: list[str] = [],
     table_name: str = "",  # leave empty if dryrun
 ) -> int:
-    logging.debug(f"chunk_filing form {form_type} of {filing}")
+    logger.debug(f"chunk_filing form {form_type} of {filing}")
 
     if filing:
         filing_path, filing_content = filing.get_doc_content(form_type, max_items=1)[0]
@@ -62,6 +62,9 @@ def get_embeddings(
         accession_number=accession_number,
         table_name=text_table_name,
         tags=tags,
+    )
+    logger.debug(
+        f"Retrieved {len(text_chunks_records)} text chunks for {cik} {accession_number}"
     )
     chunks = [record["chunk_text"] for record in text_chunks_records]
     start_t = datetime.now()

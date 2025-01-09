@@ -177,7 +177,7 @@ def edgar_file(idx_filename: str, cached_only: bool = False) -> str | None:
     e.g. edgar/data/123456/0001234567-21-000123.txt
     """
     cache_path = config.cache_path
-    logging.debug(
+    logger.debug(
         f"Reading file({idx_filename}) from {cache_path}. cached_only={cached_only})"
     )
 
@@ -220,9 +220,9 @@ def _download_file(
         os.makedirs(output_path.parent, exist_ok=True)
         with open(output_path, "wb") as file:
             file.write(response.content)
-        logging.debug("Downloaded {url} and saved to {localPath}")
+        logger.debug("Downloaded {url} and saved to {localPath}")
         return True
     else:
         # TODO: add retrying logic and etc to make it more robust
-        logging.debug(f"Failed to download from {url}: {response.status_code}")
+        logger.debug(f"Failed to download from {url}: {response.status_code}")
         return False

@@ -10,52 +10,32 @@
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "level": "INFO",
+            "level": "DEBUG",
             "formatter": "standard",
             "stream": "ext://sys.stdout"
         }
     },
     "root": {
-        "level": "DEBUG",
+        "level": "INFO",
         "handlers": [
             "console"
         ]
     },
     "loggers": {
         "edgar_sleuth": {
-            "handlers": [
-                "console"
-            ],
-            "level": "DEBUG",
-            "propagate": true
+            "level": "DEBUG"
         },
         "edgar": {
-            "handlers": [
-                "console"
-            ],
-            "level": "DEBUG",
-            "propagate": true
+            "level": "DEBUG"
         },
         "splitter": {
-            "handlers": [
-                "console"
-            ],
-            "level": "DEBUG",
-            "propagate": true
+            "level": "DEBUG"
         },
         "llm": {
-            "handlers": [
-                "console"
-            ],
-            "level": "DEBUG",
-            "propagate": true
+            "level": "DEBUG"
         },
         "datastore": {
-            "handlers": [
-                "console"
-            ],
-            "level": "DEBUG",
-            "propagate": true
+            "level": "INFO"
         }
     }
 }

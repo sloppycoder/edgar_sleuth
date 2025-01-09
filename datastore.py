@@ -131,12 +131,14 @@ def initialize_search_phrases(table_name: str, data, tags: list[str] = []) -> No
             (phrase, embedding, tags),
         )
 
+    logger.info(f"Initialized {len(data)} search phrases in {table_name}")
+
 
 def execute_query(query, params=None) -> list[dict[str, Any]]:
     result = []
     try:
         with _conn().cursor() as cur:
-            logging.debug(f"Executing query: {query}")
+            logger.debug(f"Executing query: {query}\nwith parameters: {params}")
 
             if sql_select_regex.search(query):
                 # it's a select
