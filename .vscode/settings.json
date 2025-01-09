@@ -19,15 +19,15 @@
             "previewLimit": 50,
             "server": "localhost",
             "driver": "PostgreSQL",
-            "name": "local_edgar",
-            "connectString": "postgresql://@/edgar"
+            "name": "local_test",
+            "connectString": "postgresql://@/edgar_test"
         },
         {
             "previewLimit": 50,
             "server": "localhost",
             "driver": "PostgreSQL",
-            "name": "local_test",
-            "connectString": "postgresql://@/edgar_test"
+            "connectString": "postgresql://@/edgar2",
+            "name": "edgar2"
         }
     ],
 }

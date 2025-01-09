@@ -12,8 +12,9 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "load",
-                "--dryrun"
+                "extract",
+                "--batch=@test1.jsonl",
+                "--tag=123"
             ]
         },
         {
