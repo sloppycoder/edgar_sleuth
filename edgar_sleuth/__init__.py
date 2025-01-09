@@ -4,7 +4,7 @@ from datetime import datetime
 from datastore import get_chunks, save_chunks
 from edgar import SECFiling
 from llm.embedding import GEMINI_EMBEDDING_MODEL, batch_embedding
-from splitter import chunk_text
+from splitter import chunk_text, default_text_converter
 
 __version__ = "0.1.0"
 
@@ -21,7 +21,10 @@ def chunk_filing(
     logging.debug(f"chunk_filing form {form_type} of {filing}")
 
     if filing:
-        _, filing_content = filing.get_doc_content(form_type, max_items=1)[0]
+        filing_path, filing_content = filing.get_doc_content(form_type, max_items=1)[0]
+
+        if filing_path.endswith(".html") or filing_path.endswith(".htm"):
+            filing_content = default_text_converter().handle(filing_content)
 
         start_t = datetime.now()
         chunks = chunk_text(filing_content, method=method)
@@ -34,8 +37,8 @@ def chunk_filing(
             if table_name:
                 logger.debug(f"Saving {len(chunks)} text chunks to {table_name}")
                 save_chunks(
-                    cik="1035018",
-                    accession_number="0001193125-20-000327",
+                    cik=filing.cik,
+                    accession_number=filing.accession_number,
                     chunks=chunks,
                     table_name=table_name,
                     tags=tags,

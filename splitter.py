@@ -93,10 +93,10 @@ def trim_html_content(filing_html_path: str) -> str:
     if div_to_remove:
         div_to_remove.decompose()  # type: ignore
 
-    return _default_text_converter().handle(str(soup))
+    return default_text_converter().handle(str(soup))
 
 
-def _default_text_converter():
+def default_text_converter():
     converter = html2text.HTML2Text()
     converter.ignore_links = False
     converter.ignore_images = True
