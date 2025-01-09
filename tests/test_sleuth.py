@@ -5,9 +5,8 @@ import pytest
 from edgar import SECFiling
 from edgar_sleuth import chunk_filing, get_embeddings
 from edgar_sleuth.trustee import (
-    ask_model_about_trustee_comp,
     create_search_phrase_embeddings,
-    find_relevant_text,
+    extract_trustee_comp,
 )
 from llm.embedding import GEMINI_EMBEDDING_MODEL
 
@@ -63,7 +62,7 @@ def test_process_one_filing(clean_db):
         model=GEMINI_EMBEDDING_MODEL,
         tags=tags + [search_phrase_tag],
     )
-    relevant_text = find_relevant_text(
+    response, comp_info = extract_trustee_comp(
         cik=filing.cik,
         accession_number=filing.accession_number,
         text_table_name=text_table_name,
@@ -71,12 +70,6 @@ def test_process_one_filing(clean_db):
         search_phrase_table_name=search_phrase_table_name,
         embedding_tag=tags[0],
         search_phrase_tag=search_phrase_tag,
-    )
-    assert relevant_text and len(relevant_text) > 100
-
-    # step 4: send the relevant text to the LLM model with designed prompt
-    # TODO: implement this step
-    response, comp_info = ask_model_about_trustee_comp(
-        "gemini-1.5-flash-002", relevant_text
+        model="gemini-1.5-flash-002",
     )
     assert response and comp_info and "trustees" in comp_info

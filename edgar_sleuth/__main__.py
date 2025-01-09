@@ -8,6 +8,8 @@ from typing import Iterator
 import click
 
 from edgar import SECFiling
+from edgar_sleuth.trustee import create_search_phrase_embeddings, extract_trustee_comp
+from llm.embedding import GEMINI_EMBEDDING_MODEL
 
 from . import chunk_filing, get_embeddings
 
@@ -61,7 +63,7 @@ def enumerate_filings(batch: str) -> Iterator[SECFiling]:
 @click.command()
 @click.argument(
     "action",
-    type=click.Choice(["chunk", "embed", "extract"], case_sensitive=False),
+    type=click.Choice(["init", "chunk", "embed", "extract"], case_sensitive=False),
 )
 @click.option(
     "--refresh",
@@ -80,24 +82,38 @@ chunk will be run before embedding""",
 """,
 )
 @click.option(
-    "--tags",
+    "--tag",
     required=False,
-    help="tags to assocate database records created by the run",
+    help="tag to assocate database records created by the run",
 )
 @click.option("--dryrun", is_flag=True, help="Print filing only, does not run any action")
+# ruff: noqa: C901
 def main(
     action: str,
     dryrun: bool,
     refresh: bool,
     batch: str,
-    tags: str,
+    tag: str,
 ) -> None:
     # hard coded values for now
     text_table_name = "filing_text_chunks"
     embedding_table_name = "filing_chunks_embeddings"
+    search_phrase_table_name = "search_phrase_embeddings"
+    search_phrase_tag = "gemini_768"
     form_type = "485BPOS"
 
-    data_tags = tags.split(",") if tags else []
+    if action == "init":
+        print("Initializing search phrase embeddings...")
+        create_search_phrase_embeddings(
+            search_phrase_table_name,
+            model=GEMINI_EMBEDDING_MODEL,
+            tags=[tag, search_phrase_tag],
+        )
+        return
+
+    elif action not in ["chunk", "embed", "extract"]:
+        print(f"Unknown action {action}")
+        return
 
     n_errors = 0
 
@@ -114,7 +130,7 @@ def main(
             n_chunks = chunk_filing(
                 filing=filing,
                 form_type=form_type,
-                tags=data_tags,
+                tags=[tag],
                 table_name=text_table_name,
             )
             if n_chunks > 1:
@@ -130,7 +146,7 @@ def main(
                 text_table_name=text_table_name,
                 cik=filing.cik,
                 accession_number=filing.accession_number,
-                tags=data_tags,
+                tags=[tag],
                 embedding_table_name=embedding_table_name,
             )
             if n_chunks > 1:
@@ -140,7 +156,20 @@ def main(
                 n_errors += 1
 
         elif action == "extract":
-            print("extraction not yet implemented")
+            model = "gemini-1.5-flash-002"
+            response, comp_info = extract_trustee_comp(
+                cik=filing.cik,
+                accession_number=filing.accession_number,
+                text_table_name=text_table_name,
+                embedding_table_name=embedding_table_name,
+                search_phrase_table_name=search_phrase_table_name,
+                embedding_tag=tag,
+                search_phrase_tag=search_phrase_tag,
+                model=model,
+            )
+            logger.debug(f"{model} response:{response}")
+            n_trustees = len(comp_info["trustees"]) if comp_info else 0
+            print(f"Extracted {n_trustees} from {filing}")
 
         else:
             print(f"Unknown action {action}")

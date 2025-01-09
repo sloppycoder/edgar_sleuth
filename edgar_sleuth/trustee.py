@@ -174,3 +174,42 @@ def ask_model_about_trustee_comp(model: str, relevant_text: str):
         comp_info = extract_json_from_response(response)
         return response, comp_info
     return None, None
+
+
+def extract_trustee_comp(
+    cik: str,
+    accession_number: str,
+    search_phrase_table_name: str,
+    text_table_name: str,
+    embedding_table_name: str,
+    search_phrase_tag: str,
+    embedding_tag: str,
+    model: str,
+) -> tuple[str | None, dict | None]:
+    # the extractino process has 4 steps
+    # step 1: chunk the filing
+    # step 2: get embedding
+    # the above 2 steps are outside this function
+
+    # step 3: using search phrases to run vector search
+    # use scoring alborithm to determine the most relevant text chunks
+    relevant_text = find_relevant_text(
+        cik=cik,
+        accession_number=accession_number,
+        text_table_name=text_table_name,
+        embedding_table_name=embedding_table_name,
+        search_phrase_table_name=search_phrase_table_name,
+        embedding_tag=embedding_tag,
+        search_phrase_tag=search_phrase_tag,
+    )
+    if not relevant_text or len(relevant_text) > 100:
+        logger.info(
+            f"No relevant text found for {cik},{accession_number} with tags {search_phrase_tag} and {embedding_tag}"  # noqa E501
+        )
+
+    # step 4: send the relevant text to the LLM model with designed prompt
+    response, comp_info = ask_model_about_trustee_comp(model, relevant_text)
+    if response and comp_info:
+        return response, comp_info
+
+    return None, None
