@@ -11,7 +11,9 @@ OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
 GEMINI_EMBEDDING_MODEL = "text-embedding-005"
 
 
-def batch_embedding(chunks: list[str], model: str) -> list[list[float]]:
+def batch_embedding(
+    chunks: list[str], model: str, task_type: str = "RETRIEVAL_DOCUMENT"
+) -> list[list[float]]:
     """
     Generates embeddings for a list of text chunks using either OpenAI or
     Gemini embedding model.
@@ -51,6 +53,7 @@ def batch_embedding(chunks: list[str], model: str) -> list[list[float]]:
             result = _call_embedding_api(
                 content=current_batch,
                 model=model,
+                task_type=task_type,
             )
             embeddings.extend(result)
             current_batch = []
@@ -65,6 +68,7 @@ def batch_embedding(chunks: list[str], model: str) -> list[list[float]]:
         result = _call_embedding_api(
             content=current_batch,
             model=model,
+            task_type=task_type,
         )
         embeddings.extend(result)
 
@@ -72,7 +76,7 @@ def batch_embedding(chunks: list[str], model: str) -> list[list[float]]:
 
 
 def _call_embedding_api(
-    content: list[str], model: str, task_type: str = "RETRIEVAL_DOCUMENT"
+    content: list[str], model: str, task_type: str
 ) -> list[list[float]]:
     if model == OPENAI_EMBEDDING_MODEL:
         return _call_openai_embedding_api(content, model=model)
@@ -130,8 +134,3 @@ def _call_gemini_embedding_api(
             raise RetriableServerError(e)
         else:
             raise
-
-
-# def _serialize_f32(vector: list[float]) -> bytes:
-#     """serializes a glist of floats into a compact "raw bytes" format"""
-#     return struct.pack("%sf" % len(vector), *vector)

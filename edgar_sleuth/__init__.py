@@ -58,6 +58,7 @@ def get_embeddings(
         cik=cik,
         accession_number=accession_number,
         table_name=text_table_name,
+        tags=tags,
     )
     chunks = [record["chunk_text"] for record in text_chunks_records]
     start_t = datetime.now()
