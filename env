@@ -1,0 +1,7 @@
+GOOGLE_APPLICATION_CREDENTIALS=<service_account_key.json>
+GCP_PROJECT_ID=<project_id>
+OPENAI_API_KEY=sk-you-wish
+DATABASE_URL=postgresql://@/database
+TEST_DATABASE_URL=postgresql://@/database_test
+cache_path=cache
+PYTEST_RUN_MODELS=0
