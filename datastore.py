@@ -1,4 +1,5 @@
 import logging
+import re
 from functools import lru_cache
 from typing import Any
 
@@ -7,6 +8,8 @@ import psycopg
 import config
 
 logger = logging.getLogger(__name__)
+
+sql_select_regex = re.compile(r"\bSELECT\b.*?\bFROM\b", re.DOTALL | re.IGNORECASE)
 
 
 def _gen_create_statement(table_name: str, dimension: int = 0) -> str:
@@ -93,9 +96,9 @@ def get_chunks(
         f"""
         SELECT cik, accession_number, chunk_number, {col}
         FROM {table_name}
-        WHERE cik = %s AND accession_number = %s
+        WHERE cik = %s AND accession_number = %s AND tags = %s
     """,
-        (cik, accession_number),
+        (cik, accession_number, tags),
     )
     return results
 
@@ -104,10 +107,19 @@ def execute_query(query, params=None) -> list[dict[str, Any]]:
     result = []
     try:
         with _conn().cursor() as cur:
-            cur.execute(query, params)
-            rows = cur.fetchall()
-            column_names = [desc[0] for desc in cur.description]  # pyright: ignore
-            result = [dict(zip(column_names, row)) for row in rows]
+            if sql_select_regex.search(query):
+                # it's a select
+                cur.execute(query, params)
+                rows = cur.fetchall()
+                column_names = [desc[0] for desc in cur.description]  # pyright: ignore
+                result = [dict(zip(column_names, row)) for row in rows]
+            else:
+                # it's not a select
+                cur.execute(query, params)
+                _conn().commit()
+    except psycopg.errors.SyntaxError as e:
+        logger.info(f"Syntax error: {str(e)} {query}")
     except psycopg.Error as e:
-        logger.info(f"Database error: {e}")
+        logger.info(f"Database error: {e} when executing {query}")
+
     return result
