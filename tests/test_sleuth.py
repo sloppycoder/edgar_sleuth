@@ -17,13 +17,14 @@ run_models = os.environ.get("PYTEST_RUN_MODELS", "0") == "1"
     not run_models or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") is None,
     reason="reduce runtime and cost for API calling",
 )
-def test_process_one_filing(clean_db):
+def test_fully_process_one_filing(clean_db):
     """take one simple filing and run through the entire flow"""
 
     # table names used for testing
     text_table_name = "filing_text_chunks"
     embedding_table_name = "filing_chunks_embeddings"
     search_phrase_table_name = "search_phrase_embeddings"
+    dimension = 256
 
     # simple filing
     cik = "1002427"
@@ -51,6 +52,7 @@ def test_process_one_filing(clean_db):
         accession_number=accession_number,
         tags=tags,
         embedding_table_name=embedding_table_name,
+        dimension=dimension,
     )
     assert n_embeddings == n_chunks
 
@@ -61,6 +63,7 @@ def test_process_one_filing(clean_db):
         search_phrase_table_name,
         model=GEMINI_EMBEDDING_MODEL,
         tags=tags + [search_phrase_tag],
+        dimension=dimension,
     )
     response, comp_info = extract_trustee_comp(
         cik=filing.cik,

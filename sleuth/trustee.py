@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from .datastore import execute_query, initialize_search_phrases
 from .llm.algo import (
@@ -74,11 +75,14 @@ Please remove the leading $ sign and comma from compensation Amount.
 """  # noqa: E501
 
 
-def create_search_phrase_embeddings(table_name: str, model: str, tags: list[str]) -> None:
+def create_search_phrase_embeddings(
+    table_name: str, model: str, tags: list[str], dimension: int
+) -> None:
     embeddings = batch_embedding(
         chunks=TRUSTEE_COMP_SEARCH_PHRASES,
         model=model,
         task_type="RETRIEVAL_QUERY",
+        dimension=dimension,
     )
     data = list(zip(TRUSTEE_COMP_SEARCH_PHRASES, embeddings))
     initialize_search_phrases(table_name=table_name, data=data, tags=tags)
@@ -175,8 +179,14 @@ def find_relevant_text(
 
 
 def ask_model_about_trustee_comp(model: str, relevant_text: str):
+    start_t = datetime.now()
     prompt = TRUSTEE_COMP_PROMPT.replace("{SEC_FILING_SNIPPET}", relevant_text)
     response = ask_model(model, prompt)
+    elapsed_t = datetime.now() - start_t
+    logger.debug(
+        f"ask {model} with prompt of {len(prompt)} took {elapsed_t.total_seconds()} seconds"  # noqa E501
+    )
+
     if response:
         comp_info = extract_json_from_response(response)
         return response, comp_info

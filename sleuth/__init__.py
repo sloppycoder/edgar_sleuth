@@ -53,6 +53,7 @@ def get_embeddings(
     text_table_name: str,
     cik: str,
     accession_number: str,
+    dimension: int,
     tags: list[str] = [],
     model: str = GEMINI_EMBEDDING_MODEL,
     embedding_table_name: str = "",
@@ -67,8 +68,9 @@ def get_embeddings(
         f"Retrieved {len(text_chunks_records)} text chunks for {cik} {accession_number}"
     )
     chunks = [record["chunk_text"] for record in text_chunks_records]
+
     start_t = datetime.now()
-    embeddings = batch_embedding(chunks, model=model)
+    embeddings = batch_embedding(chunks, model=model, dimension=dimension)
     elapsed_t = datetime.now() - start_t
     logger.debug(
         f"batch_embedding of {len(chunks)} chunks of text with {model} took {elapsed_t.total_seconds()} seconds"  # noqa E501

@@ -28,7 +28,7 @@ def test_save_text_chunks(clean_db):
 
 
 def test_save_embedding_chunks(clean_db):
-    dimension = 768
+    dimension = 256
     embedding_chunks = [
         _rand_vec(dimension),
         _rand_vec(dimension),
@@ -45,7 +45,7 @@ def test_save_embedding_chunks(clean_db):
 
 
 def test_initialize_search_phrases(clean_db):
-    dimension = 768
+    dimension = 256
     search_phrase_table_name = "search_phrase_embeddings"
     random_data = [
         ("The quick brown", _rand_vec(dimension)),

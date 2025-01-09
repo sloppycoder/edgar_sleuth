@@ -12,7 +12,10 @@ GEMINI_EMBEDDING_MODEL = "text-embedding-005"
 
 
 def batch_embedding(
-    chunks: list[str], model: str, task_type: str = "RETRIEVAL_DOCUMENT"
+    chunks: list[str],
+    model: str,
+    dimension: int,
+    task_type: str = "RETRIEVAL_DOCUMENT",
 ) -> list[list[float]]:
     """
     Generates embeddings for a list of text chunks using either OpenAI or
@@ -54,6 +57,7 @@ def batch_embedding(
                 content=current_batch,
                 model=model,
                 task_type=task_type,
+                dimension=dimension,
             )
             embeddings.extend(result)
             current_batch = []
@@ -69,6 +73,7 @@ def batch_embedding(
             content=current_batch,
             model=model,
             task_type=task_type,
+            dimension=dimension,
         )
         embeddings.extend(result)
 
@@ -76,12 +81,23 @@ def batch_embedding(
 
 
 def _call_embedding_api(
-    content: list[str], model: str, task_type: str
+    content: list[str],
+    model: str,
+    task_type: str,
+    dimension: int,
 ) -> list[list[float]]:
     if model == OPENAI_EMBEDDING_MODEL:
-        return _call_openai_embedding_api(content, model=model)
+        return _call_openai_embedding_api(
+            content,
+            model=model,
+        )
     elif model == GEMINI_EMBEDDING_MODEL:
-        return _call_gemini_embedding_api(content, model=model, task_type=task_type)
+        return _call_gemini_embedding_api(
+            content,
+            model=model,
+            task_type=task_type,
+            dimensionality=dimension,
+        )
     else:
         raise ValueError(f"Unsupported embedding model {model}")
 
@@ -118,7 +134,7 @@ def _call_openai_embedding_api(input_: list[str], model: str) -> list[list[float
     retry=retry_if_exception_type(RetriableServerError),
 )
 def _call_gemini_embedding_api(
-    content: list[str], model: str, task_type: str
+    content: list[str], model: str, task_type: str, dimensionality: int
 ) -> list[list[float]]:
     try:
         init_vertaxai()
@@ -127,6 +143,7 @@ def _call_gemini_embedding_api(
         embeddings = embedding_model.get_embeddings(
             texts=inputs,  # pyright: ignore
             auto_truncate=True,
+            output_dimensionality=dimensionality,
         )
         return [e.values for e in embeddings]
     except GoogleAPICallError as e:

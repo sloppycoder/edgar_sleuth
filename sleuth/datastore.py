@@ -116,7 +116,8 @@ def get_chunks(
 
 
 def initialize_search_phrases(table_name: str, data, tags: list[str] = []) -> None:
-    statement = _gen_create_statement(table_name, dimension=len(data[0][1]))
+    dimension = len(data[0][1])
+    statement = _gen_create_statement(table_name, dimension=dimension)
     _conn().execute(statement)  # pyright: ignore
 
     phrases = [phrase for phrase, _ in data]
@@ -131,7 +132,9 @@ def initialize_search_phrases(table_name: str, data, tags: list[str] = []) -> No
             (phrase, embedding, tags),
         )
 
-    logger.info(f"Initialized {len(data)} search phrases in {table_name}")
+    logger.info(
+        f"Initialized {len(data)} search phrases in {table_name} with size {dimension}"
+    )
 
 
 def execute_query(query, params=None) -> list[dict[str, Any]]:
