@@ -49,7 +49,7 @@ def __getattr__(key: str) -> str:
         return val
     else:
         print(f"WARN: Config key {key} used before being set")
-        return ""
+        return val
 
 
 # use a funciton because overriding __setattr__ is not allowed
