@@ -1,8 +1,8 @@
 import logging
 
-from datastore import execute_query
+from datastore import execute_query, initialize_search_phrases
 from llm.algo import gather_chunk_distances, most_relevant_chunks, relevance_by_distance
-from llm.embedding import GEMINI_EMBEDDING_MODEL, batch_embedding
+from llm.embedding import batch_embedding
 from llm.extraction import ask_model, extract_json_from_response
 
 logger = logging.getLogger(__name__)
@@ -70,30 +70,14 @@ Please remove the leading $ sign and comma from compensation Amount.
 """  # noqa: E501
 
 
-def create_search_phrases_embeddings(table_name: str, tags: list[str] = []) -> None:
+def create_search_phrase_embeddings(table_name: str, model: str, tags: list[str]) -> None:
     embeddings = batch_embedding(
-        TRUSTEE_COMP_SEARCH_PHRASES,
-        GEMINI_EMBEDDING_MODEL,
+        chunks=TRUSTEE_COMP_SEARCH_PHRASES,
+        model=model,
         task_type="RETRIEVAL_QUERY",
     )
-
-    execute_query(f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            phrase VARCHAR(255) PRIMARY KEY,
-            phrase_embedding VECTOR(768),
-            tags TEXT[]
-        )""")
-
-    execute_query(
-        f"DELETE FROM {table_name} WHERE phrase = ANY(%s) AND tags = %s",
-        (TRUSTEE_COMP_SEARCH_PHRASES, tags),
-    )
-
-    for n, phrase in enumerate(TRUSTEE_COMP_SEARCH_PHRASES):
-        execute_query(
-            f"INSERT INTO {table_name} (phrase, phrase_embedding, tags) VALUES (%s, %s, %s)",  # noqa: E501
-            (phrase, embeddings[n], tags),
-        )
+    data = list(zip(TRUSTEE_COMP_SEARCH_PHRASES, embeddings))
+    initialize_search_phrases(table_name=table_name, data=data, tags=tags)
 
 
 def get_relevant_chunks_with_distances(
@@ -101,6 +85,8 @@ def get_relevant_chunks_with_distances(
     accession_number: str,
     embedding_table_name: str,
     search_phrase_table_name: str,
+    search_phrase_tag: str,
+    embedding_tag: str,
 ):
     # limit 12 is like top_k =3 for 4 search phrases
     result = execute_query(
@@ -109,15 +95,16 @@ def get_relevant_chunks_with_distances(
             cik, accession_number, phrase, chunk_num,
             embedding <=> phrase_embedding as distance
         FROM
-            {search_phrase_table_name} p,
-            {embedding_table_name} e
-            where
-               cik = %s and accession_number = %s
-            order by
+            {search_phrase_table_name} phrases,
+            {embedding_table_name} docs
+        WHERE
+            cik = %s AND accession_number = %s
+            AND %s = ANY(phrases.tags) AND %s = ANY(docs.tags)
+            ORDER BY
                 embedding <=> phrase_embedding
             limit 12;
     """,
-        (cik, accession_number),
+        (cik, accession_number, search_phrase_tag, embedding_tag),
     )
     return result
 
@@ -153,12 +140,16 @@ def find_relevant_text(
     text_table_name: str,
     embedding_table_name: str,
     search_phrase_table_name: str,
+    embedding_tag: str,
+    search_phrase_tag: str,
 ) -> str:
     relevance_result = get_relevant_chunks_with_distances(
         cik=cik,
         accession_number=accession_number,
         embedding_table_name=embedding_table_name,
         search_phrase_table_name=search_phrase_table_name,
+        search_phrase_tag=search_phrase_tag,
+        embedding_tag=embedding_tag,
     )
 
     chunk_distances = gather_chunk_distances(relevance_result)

@@ -81,7 +81,6 @@ def get_embeddings(
                 table_name=embedding_table_name,
                 tags=tags,
                 create_table=True,
-                dimension=len(embeddings[0]),
             )
         return len(embeddings)
 

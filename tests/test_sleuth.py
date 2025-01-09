@@ -6,9 +6,10 @@ from edgar import SECFiling
 from edgar_sleuth import chunk_filing, get_embeddings
 from edgar_sleuth.trustee import (
     ask_model_about_trustee_comp,
-    create_search_phrases_embeddings,
+    create_search_phrase_embeddings,
     find_relevant_text,
 )
+from llm.embedding import GEMINI_EMBEDDING_MODEL
 
 run_models = os.environ.get("PYTEST_RUN_MODELS", "0") == "1"
 
@@ -23,7 +24,7 @@ def test_process_one_filing(clean_db):
     # table names used for testing
     text_table_name = "filing_text_chunks"
     embedding_table_name = "filing_chunks_embeddings"
-    search_phrase_table_name = "trustee_comp_search_phrases"
+    search_phrase_table_name = "search_phrase_embeddings"
 
     # simple filing
     cik = "1002427"
@@ -56,13 +57,20 @@ def test_process_one_filing(clean_db):
 
     # step 3: using search phrases to run vector search
     # use scoring alborithm to determine the most relevant text chunks
-    create_search_phrases_embeddings(search_phrase_table_name, tags=tags)
+    search_phrase_tag = "gemini_768"
+    create_search_phrase_embeddings(
+        search_phrase_table_name,
+        model=GEMINI_EMBEDDING_MODEL,
+        tags=tags + [search_phrase_tag],
+    )
     relevant_text = find_relevant_text(
         cik=filing.cik,
         accession_number=filing.accession_number,
         text_table_name=text_table_name,
         embedding_table_name=embedding_table_name,
         search_phrase_table_name=search_phrase_table_name,
+        embedding_tag=tags[0],
+        search_phrase_tag=search_phrase_tag,
     )
     assert relevant_text and len(relevant_text) > 100
 

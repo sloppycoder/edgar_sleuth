@@ -1,6 +1,6 @@
 import random
 
-from datastore import execute_query, save_chunks
+from datastore import execute_query, initialize_search_phrases, save_chunks
 
 
 def test_execute_query():
@@ -30,10 +30,9 @@ def test_save_text_chunks(clean_db):
 def test_save_embedding_chunks(clean_db):
     dimension = 768
     embedding_chunks = [
-        [random.uniform(0.0, 1.0) for _ in range(dimension)],
-        [random.uniform(0.0, 1.0) for _ in range(dimension)],
-        [random.uniform(0.0, 1.0) for _ in range(dimension)],
-        [random.uniform(0.0, 1.0) for _ in range(dimension)],
+        _rand_vec(dimension),
+        _rand_vec(dimension),
+        _rand_vec(dimension),
     ]
     save_chunks(
         cik="12345678",
@@ -42,5 +41,22 @@ def test_save_embedding_chunks(clean_db):
         table_name="filing_chunks_embeddings",
         tags=["testing", "pytest"],
         create_table=True,
-        dimension=dimension,
     )
+
+
+def test_initialize_search_phrases(clean_db):
+    dimension = 768
+    search_phrase_table_name = "search_phrase_embeddings"
+    random_data = [
+        ("The quick brown", _rand_vec(dimension)),
+        ("A wizard's job", _rand_vec(dimension)),
+    ]
+    initialize_search_phrases(
+        table_name=search_phrase_table_name,
+        tags=["pytest"],
+        data=random_data,
+    )
+
+
+def _rand_vec(dimension: int) -> list[float]:
+    return [random.uniform(0.0, 1.0) for _ in range(dimension)]

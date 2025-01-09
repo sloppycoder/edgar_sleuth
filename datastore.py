@@ -31,6 +31,13 @@ def _gen_create_statement(table_name: str, dimension: int = 0) -> str:
             embedding VECTOR ({dimension}) NOT NULL,
             tags TEXT[])
         """
+    elif table_name.startswith("search_phrase_embeddings"):
+        return f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            phrase VARCHAR(255) PRIMARY KEY,
+            phrase_embedding VECTOR({dimension}),
+            tags TEXT[]
+        )"""
     else:
         raise ValueError(f"Do not know how to create table {table_name}")
 
@@ -48,8 +55,13 @@ def save_chunks(
     table_name: str,
     tags: list[str] = [],
     create_table: bool = False,
-    dimension: int = 0,
-):
+) -> None:
+    if len(chunks) == 0:
+        return
+
+    # dimenion only matters when saving embeddings
+    dimension = len(chunks[0]) if isinstance(chunks[0], list) else 0
+
     if create_table:
         statement = _gen_create_statement(table_name, dimension=dimension)
         _conn().execute(statement)  # pyright: ignore
@@ -103,10 +115,29 @@ def get_chunks(
     return results
 
 
+def initialize_search_phrases(table_name: str, data, tags: list[str] = []) -> None:
+    statement = _gen_create_statement(table_name, dimension=len(data[0][1]))
+    _conn().execute(statement)  # pyright: ignore
+
+    phrases = [phrase for phrase, _ in data]
+    execute_query(
+        f"DELETE FROM {table_name} WHERE phrase = ANY(%s) AND tags = %s",
+        (phrases, tags),
+    )
+
+    for phrase, embedding in data:
+        execute_query(
+            f"INSERT INTO {table_name} (phrase,phrase_embedding,tags) VALUES (%s,%s,%s)",
+            (phrase, embedding, tags),
+        )
+
+
 def execute_query(query, params=None) -> list[dict[str, Any]]:
     result = []
     try:
         with _conn().cursor() as cur:
+            logging.debug(f"Executing query: {query}")
+
             if sql_select_regex.search(query):
                 # it's a select
                 cur.execute(query, params)
