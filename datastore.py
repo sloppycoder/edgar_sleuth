@@ -18,7 +18,7 @@ def _gen_create_statement(table_name: str, dimension: int = 0) -> str:
         CREATE TABLE IF NOT EXISTS {table_name} (
             cik VARCHAR(10) NOT NULL,
             accession_number VARCHAR(20) NOT NULL,
-            chunk_number INTEGER NOT NULL,
+            chunk_num INTEGER NOT NULL,
             chunk_text TEXT NOT NULL,
             tags TEXT[])
         """
@@ -27,7 +27,7 @@ def _gen_create_statement(table_name: str, dimension: int = 0) -> str:
         CREATE TABLE IF NOT EXISTS {table_name} (
             cik VARCHAR(10) NOT NULL,
             accession_number VARCHAR(20) NOT NULL,
-            chunk_number INTEGER NOT NULL,
+            chunk_num INTEGER NOT NULL,
             embedding VECTOR ({dimension}) NOT NULL,
             tags TEXT[])
         """
@@ -79,7 +79,7 @@ def save_chunks(
         col = "embedding" if dimension > 10 else "chunk_text"
         cur.executemany(
             f"""
-            INSERT INTO {table_name} (cik, accession_number, chunk_number, {col}, tags)
+            INSERT INTO {table_name} (cik, accession_number, chunk_num, {col}, tags)
             VALUES (%s, %s, %s, %s, %s)
             """,  # pyright: ignore
             data,
@@ -94,7 +94,7 @@ def get_chunks(
 
     results = execute_query(
         f"""
-        SELECT cik, accession_number, chunk_number, {col}
+        SELECT cik, accession_number, chunk_num, {col}
         FROM {table_name}
         WHERE cik = %s AND accession_number = %s AND tags = %s
     """,
