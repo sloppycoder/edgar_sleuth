@@ -114,6 +114,7 @@ def get_text_by_chunk_num(
     cik: str,
     accession_number: str,
     chunk_nums: list[int],
+    tag: str,
 ) -> str:
     result = execute_query(
         f"""
@@ -122,11 +123,10 @@ def get_text_by_chunk_num(
         FROM
             {text_table_name}
         WHERE
-            cik = %s
-            AND accession_number = %s
-            AND chunk_num = ANY(%s)
+            cik = %s AND accession_number = %s
+            AND %s = ANY(tags) AND chunk_num = ANY(%s)
     """,
-        (cik, accession_number, chunk_nums),
+        (cik, accession_number, tag, chunk_nums),
     )
     if result:
         return result[0]["relevant_text"]
@@ -155,11 +155,14 @@ def find_relevant_text(
     chunk_distances = gather_chunk_distances(relevance_result)
     relevance_scores = relevance_by_distance(chunk_distances)
     selected_chunks = [int(s) for s in most_relevant_chunks(relevance_scores)]
+    logger.debug(f"Selected chunks: {selected_chunks}")
+
     relevant_text = get_text_by_chunk_num(
         cik=cik,
         accession_number=accession_number,
         chunk_nums=selected_chunks,
         text_table_name=text_table_name,
+        tag=embedding_tag,
     )
     if relevant_text and len(relevant_text) > 100:
         return relevant_text
@@ -202,7 +205,7 @@ def extract_trustee_comp(
         embedding_tag=embedding_tag,
         search_phrase_tag=search_phrase_tag,
     )
-    if not relevant_text or len(relevant_text) > 100:
+    if not relevant_text or len(relevant_text) < 100:
         logger.info(
             f"No relevant text found for {cik},{accession_number} with tags {search_phrase_tag} and {embedding_tag}"  # noqa E501
         )
