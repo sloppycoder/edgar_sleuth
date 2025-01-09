@@ -27,6 +27,7 @@ cdk.out
 # local stuff
 cache/
 *.jsonl
+tmp/
 
 # cloud credential
 edgar-*.json

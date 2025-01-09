@@ -1,18 +1,20 @@
 import json
 import logging
 import logging.config
+import multiprocessing
 import sys
+from logging.handlers import QueueListener
 from pathlib import Path
 from typing import Iterator
 
 import click
 import yaml
 
-from . import chunk_filing, get_embeddings
+from . import init_worker, log_n_print, process_filing, process_filing_wrapper
 from .datastore import execute_query
 from .edgar import SECFiling
 from .llm.embedding import GEMINI_EMBEDDING_MODEL
-from .trustee import create_search_phrase_embeddings, extract_trustee_comp
+from .trustee import create_search_phrase_embeddings
 
 MAX_ERRORS = 5
 
@@ -48,7 +50,7 @@ def enumerate_filings(batch: str, batch_limit: int) -> Iterator[SECFiling]:
     n_processed = 0
     for line in lines:
         if batch_limit and n_processed >= batch_limit:
-            print("Reached batch limit of {batch_limit}. Exiting.")
+            print(f"Reached batch limit of {batch_limit}")
             break
 
         try:
@@ -66,11 +68,6 @@ def enumerate_filings(batch: str, batch_limit: int) -> Iterator[SECFiling]:
                 print(f"ERROR: Ignored invalid entry: {entry}")
         except json.JSONDecodeError:
             print(f"ERROR: invalid json {line}")
-
-
-def log_n_print(message):
-    print(message)
-    logger.info(message)
 
 
 @click.command()
@@ -119,6 +116,12 @@ chunk will be run before embedding""",
     default=768,
     help="Dimensionality of embeddings. Only applicable when using Gemini API",
 )
+@click.option(
+    "--workers",
+    type=int,
+    default=1,
+    help="Number of works to use for processing. Each worker will process 1 filing at a time",  # noqa: E501
+)
 @click.option("--dryrun", is_flag=True, help="Print filing only, does not run any action")
 # ruff: noqa: C901
 def main(
@@ -130,6 +133,7 @@ def main(
     tags_str: str,
     search_tag: str,
     dimension: int,
+    workers: int,
 ) -> None:
     # validate tag values first.
     if not search_tag and action in ["init", "initdb", "extract"]:
@@ -179,64 +183,60 @@ def main(
         )
         return
 
-    elif action not in ["chunk", "embedding", "extract"]:
-        print(f"Unknown action {action}")
-        return
+    actions = [action]
+    if full:
+        if action == "embedding":
+            actions = ["chunk", "embedding"]
+        elif action == "extract":
+            actions = ["chunk", "embedding", "extract"]
 
-    n_errors = 0
+    if dryrun or workers == 1:
+        for filing in enumerate_filings(batch, batch_limit):
+            if dryrun:
+                print(filing)
+                continue
 
-    for filing in enumerate_filings(batch, batch_limit):
-        if dryrun:
-            print(filing)
-            continue
-
-        if n_errors > MAX_ERRORS:
-            log_n_print(f"Aborting after reaching max errors: {MAX_ERRORS}")
-            break
-
-        if action == "chunk" or (action in ["extract", "embedding"] and full):
-            n_chunks = chunk_filing(
-                filing=filing,
-                form_type=form_type,
-                tags=tags,
-                table_name=text_table_name,
-            )
-            if n_chunks > 1:
-                log_n_print(f"{filing} {form_type} splitted into {n_chunks} chunks")
-            else:
-                log_n_print(f"Error when splitting {filing} {form_type}")
-                n_errors += 1
-
-        if action == "embedding" or (action in ["extract"] and full):
-            n_chunks = get_embeddings(
-                text_table_name=text_table_name,
-                cik=filing.cik,
-                accession_number=filing.accession_number,
-                tag=tags[0],
-                embedding_table_name=embedding_table_name,
+            process_filing(
+                actions=actions,
+                search_tag=search_tag,
                 dimension=dimension,
-            )
-            if n_chunks > 1:
-                log_n_print(f"Saved {n_chunks} embeddings for {filing} {form_type}")
-            else:
-                log_n_print(f"Error when get embeddings for {filing} {form_type}")
-                n_errors += 1
-
-        if action == "extract":
-            model = "gemini-1.5-flash-002"
-            response, comp_info = extract_trustee_comp(
-                cik=filing.cik,
-                accession_number=filing.accession_number,
+                filing=filing,
+                tags=tags,
+                model="gemini-1.5-flash-002",
                 text_table_name=text_table_name,
                 embedding_table_name=embedding_table_name,
                 search_phrase_table_name=search_phrase_table_name,
-                tag=tags[0],
-                search_phrase_tag=search_tag,
-                model=model,
+                form_type=form_type,
             )
-            logger.debug(f"{model} response:{response}")
-            n_trustees = len(comp_info["trustees"]) if comp_info else 0
-            log_n_print(f"Extracted {n_trustees} from {filing}")
+    else:
+        all_filings = list(enumerate_filings(batch, batch_limit))
+        args = [
+            {
+                "actions": actions,
+                "search_tag": search_tag,
+                "dimension": dimension,
+                "filing": filing,
+                "tags": tags,
+                "model": "gemini-1.5-flash-002",
+                "text_table_name": text_table_name,
+                "embedding_table_name": embedding_table_name,
+                "search_phrase_table_name": search_phrase_table_name,
+                "form_type": form_type,
+            }
+            for filing in all_filings
+        ]
+
+        # create a queue to receive log messages from worker processes
+        # https://stackoverflow.com/questions/641420/how-should-i-log-while-using-multiprocessing-in-python
+        logging_q = multiprocessing.Queue()
+        handler = logging.getHandlerByName("console")  # defined in logger_config.yaml
+        q_listener = QueueListener(logging_q, handler)
+        q_listener.start()
+
+        with multiprocessing.Pool(workers, init_worker, (logging_q,)) as pool:
+            pool.map(process_filing_wrapper, args)
+
+        q_listener.stop()
 
 
 if __name__ == "__main__":

@@ -1,10 +1,12 @@
 import logging
 from datetime import datetime
+from logging.handlers import QueueHandler
 
 from .datastore import get_chunks, save_chunks
 from .edgar import SECFiling
 from .llm.embedding import GEMINI_EMBEDDING_MODEL, batch_embedding
 from .splitter import chunk_text, default_text_converter
+from .trustee import extract_trustee_comp
 
 __version__ = "0.1.0"
 
@@ -90,3 +92,84 @@ def get_embeddings(
         return len(embeddings)
 
     return 0
+
+
+def log_n_print(message):
+    print(message)
+    logger.info(message)
+
+
+def process_filing(
+    actions: list[str],
+    search_tag: str,
+    dimension: int,
+    filing: SECFiling,
+    tags: list[str],
+    model: str,
+    text_table_name: str,
+    embedding_table_name: str,
+    search_phrase_table_name: str,
+    form_type: str,
+):
+    log_n_print(
+        f"Processing {filing} for {actions} with search_tag={search_tag}, tags={tags}"
+    )
+
+    if "chunk" in actions:
+        n_chunks = chunk_filing(
+            filing=filing,
+            form_type=form_type,
+            tags=tags,
+            table_name=text_table_name,
+        )
+        if n_chunks > 1:
+            log_n_print(f"{filing} {form_type} splitted into {n_chunks} chunks")
+        else:
+            log_n_print(f"Error when splitting {filing} {form_type}")
+
+    if "embedding" in actions:
+        n_chunks = get_embeddings(
+            text_table_name=text_table_name,
+            cik=filing.cik,
+            accession_number=filing.accession_number,
+            tag=tags[0],
+            embedding_table_name=embedding_table_name,
+            dimension=dimension,
+        )
+        if n_chunks > 1:
+            log_n_print(f"Saved {n_chunks} embeddings for {filing} {form_type}")
+        else:
+            log_n_print(f"Error when get embeddings for {filing} {form_type}")
+
+    if "extract" in actions:
+        response, comp_info = extract_trustee_comp(
+            cik=filing.cik,
+            accession_number=filing.accession_number,
+            text_table_name=text_table_name,
+            embedding_table_name=embedding_table_name,
+            search_phrase_table_name=search_phrase_table_name,
+            tag=tags[0],
+            search_phrase_tag=search_tag,
+            model=model,
+        )
+        logger.debug(f"{model} response:{response}")
+        n_trustees = len(comp_info["trustees"]) if comp_info else 0
+        log_n_print(f"Extracted {n_trustees} from {filing}")
+
+
+def process_filing_wrapper(args: dict):
+    # wrapper for multiprocessing
+    # init logging for each worker to use QueueHandler that sends the logs
+    # to the main process
+    process_filing(**args)
+
+
+def init_worker(logging_q):
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(QueueHandler(logging_q))
+    for handler in logger.handlers:
+        if isinstance(handler, logging.StreamHandler):
+            print("CHILD: Removing StreamHandler...")
+            logger.removeHandler(handler)
+            break
