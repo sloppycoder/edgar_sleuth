@@ -33,7 +33,7 @@ def create_filing(
         return SECFiling(cik=cik, accession_number=accession_number)
 
 
-def enumerate_filings(batch: str) -> Iterator[SECFiling]:
+def enumerate_filings(batch: str, batch_limit: int) -> Iterator[SECFiling]:
     if batch.startswith("@"):
         with open(batch[1:], "r") as f:
             lines = f.readlines()
@@ -45,12 +45,19 @@ def enumerate_filings(batch: str) -> Iterator[SECFiling]:
     else:
         lines = [batch]
 
+    n_processed = 0
     for line in lines:
+        if batch_limit and n_processed >= batch_limit:
+            print("Reached batch limit of {batch_limit}. Exiting.")
+            break
+
         try:
             entry = json.loads(line)
             if entry.get("idx_filename"):
+                n_processed += 1
                 yield SECFiling(idx_filename=entry["idx_filename"])
             elif entry.get("cik") and entry.get("accession_number"):
+                n_processed += 1
                 yield SECFiling(
                     cik=entry["cik"],
                     accession_number=entry["accession_number"],
@@ -59,6 +66,14 @@ def enumerate_filings(batch: str) -> Iterator[SECFiling]:
                 print(f"ERROR: Ignored invalid entry: {entry}")
         except json.JSONDecodeError:
             print(f"ERROR: invalid json {line}")
+
+
+# def validate_option(ctx, param, value):
+#     """Callback for conditional validations"""
+#     action = ctx.params.get("action")
+#     if action in ["init", "initdb"] and param == "dimension" and not value:
+#         raise click.BadParameter("--dimension is required when action ")
+#     return value
 
 
 @click.command()
@@ -85,9 +100,21 @@ chunk will be run before embedding""",
 """,
 )
 @click.option(
+    "--batch-limit",
+    type=int,
+    default=0,
+    help="Number of records to process in batch mode, 0 means unlimited",
+)
+@click.option(
     "--tag",
     required=False,
     help="tag to assocate database records created by the run",
+)
+@click.option(
+    "--dimension",
+    type=int,
+    default=768,
+    help="Dimensionality of embeddings. Only applicable when using Gemini API",
 )
 @click.option("--dryrun", is_flag=True, help="Print filing only, does not run any action")
 # ruff: noqa: C901
@@ -96,7 +123,9 @@ def main(
     dryrun: bool,
     full: bool,
     batch: str,
+    batch_limit: int,
     tag: str,
+    dimension: int,
 ) -> None:
     # hard coded values for now
     text_table_name = "filing_text_chunks"
@@ -123,6 +152,7 @@ def main(
             search_phrase_table_name,
             model=GEMINI_EMBEDDING_MODEL,
             tags=[tag, search_phrase_tag],
+            dimension=dimension,
         )
         return
 
@@ -132,7 +162,7 @@ def main(
 
     n_errors = 0
 
-    for filing in enumerate_filings(batch):
+    for filing in enumerate_filings(batch, batch_limit):
         if dryrun:
             print(filing)
             continue
@@ -165,6 +195,7 @@ def main(
                 accession_number=filing.accession_number,
                 tags=[tag],
                 embedding_table_name=embedding_table_name,
+                dimension=dimension,
             )
             if n_chunks > 1:
                 message = f"Saved {n_chunks} embeddings for {filing} {form_type}"
