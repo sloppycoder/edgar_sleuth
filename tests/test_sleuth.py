@@ -32,7 +32,8 @@ def test_fully_process_one_filing(clean_db):
     filing = SECFiling(cik=cik, accession_number=accession_number)
 
     # arbitrary tags for testing
-    tags = ["pytest"]
+    tag = "pytest"
+    search_tag = f"pytest_gemini_{dimension}"
 
     # the entire process has 4 steps
 
@@ -40,7 +41,7 @@ def test_fully_process_one_filing(clean_db):
     n_chunks = chunk_filing(
         filing,
         form_type="485BPOS",
-        tags=tags,
+        tags=[tag],
         table_name=text_table_name,
     )
     assert n_chunks == 272
@@ -50,7 +51,7 @@ def test_fully_process_one_filing(clean_db):
         text_table_name=text_table_name,
         cik=cik,
         accession_number=accession_number,
-        tags=tags,
+        tag=tag,
         embedding_table_name=embedding_table_name,
         dimension=dimension,
     )
@@ -58,11 +59,10 @@ def test_fully_process_one_filing(clean_db):
 
     # step 3: using search phrases to run vector search
     # use scoring alborithm to determine the most relevant text chunks
-    search_phrase_tag = "gemini_768"
     create_search_phrase_embeddings(
         search_phrase_table_name,
         model=GEMINI_EMBEDDING_MODEL,
-        tags=tags + [search_phrase_tag],
+        tag=search_tag,
         dimension=dimension,
     )
     response, comp_info = extract_trustee_comp(
@@ -71,8 +71,8 @@ def test_fully_process_one_filing(clean_db):
         text_table_name=text_table_name,
         embedding_table_name=embedding_table_name,
         search_phrase_table_name=search_phrase_table_name,
-        embedding_tag=tags[0],
-        search_phrase_tag=search_phrase_tag,
+        tag=tag,
+        search_phrase_tag=search_tag,
         model="gemini-1.5-flash-002",
     )
     assert response and comp_info and "trustees" in comp_info

@@ -76,7 +76,7 @@ Please remove the leading $ sign and comma from compensation Amount.
 
 
 def create_search_phrase_embeddings(
-    table_name: str, model: str, tags: list[str], dimension: int
+    table_name: str, model: str, tag: str, dimension: int
 ) -> None:
     embeddings = batch_embedding(
         chunks=TRUSTEE_COMP_SEARCH_PHRASES,
@@ -85,7 +85,7 @@ def create_search_phrase_embeddings(
         dimension=dimension,
     )
     data = list(zip(TRUSTEE_COMP_SEARCH_PHRASES, embeddings))
-    initialize_search_phrases(table_name=table_name, data=data, tags=tags)
+    initialize_search_phrases(table_name=table_name, data=data, tags=[tag])
 
 
 def get_relevant_chunks_with_distances(
@@ -148,7 +148,7 @@ def find_relevant_text(
     text_table_name: str,
     embedding_table_name: str,
     search_phrase_table_name: str,
-    embedding_tag: str,
+    tag: str,
     search_phrase_tag: str,
 ) -> str:
     relevance_result = get_relevant_chunks_with_distances(
@@ -157,7 +157,7 @@ def find_relevant_text(
         embedding_table_name=embedding_table_name,
         search_phrase_table_name=search_phrase_table_name,
         search_phrase_tag=search_phrase_tag,
-        embedding_tag=embedding_tag,
+        embedding_tag=tag,
     )
 
     chunk_distances = gather_chunk_distances(relevance_result)
@@ -170,7 +170,7 @@ def find_relevant_text(
         accession_number=accession_number,
         chunk_nums=selected_chunks,
         text_table_name=text_table_name,
-        tag=embedding_tag,
+        tag=tag,
     )
     if relevant_text and len(relevant_text) > 100:
         return relevant_text
@@ -200,7 +200,7 @@ def extract_trustee_comp(
     text_table_name: str,
     embedding_table_name: str,
     search_phrase_tag: str,
-    embedding_tag: str,
+    tag: str,
     model: str,
 ) -> tuple[str | None, dict | None]:
     # the extractino process has 4 steps
@@ -216,12 +216,12 @@ def extract_trustee_comp(
         text_table_name=text_table_name,
         embedding_table_name=embedding_table_name,
         search_phrase_table_name=search_phrase_table_name,
-        embedding_tag=embedding_tag,
+        tag=tag,
         search_phrase_tag=search_phrase_tag,
     )
     if not relevant_text or len(relevant_text) < 100:
         logger.info(
-            f"No relevant text found for {cik},{accession_number} with tags {search_phrase_tag} and {embedding_tag}"  # noqa E501
+            f"No relevant text found for {cik},{accession_number} with tags {search_phrase_tag} and {tag}"  # noqa E501
         )
 
     # step 4: send the relevant text to the LLM model with designed prompt

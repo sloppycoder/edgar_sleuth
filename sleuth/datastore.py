@@ -100,7 +100,7 @@ def save_chunks(
 
 
 def get_chunks(
-    cik: str, accession_number: str, table_name: str, tags: list[str] = []
+    cik: str, accession_number: str, table_name: str, tag: str
 ) -> list[dict[str, Any]]:
     col = "embeddings" if "embedding" in table_name else "chunk_text"
 
@@ -108,9 +108,9 @@ def get_chunks(
         f"""
         SELECT cik, accession_number, chunk_num, {col}
         FROM {table_name}
-        WHERE cik = %s AND accession_number = %s AND tags = %s
+        WHERE cik = %s AND accession_number = %s AND %s = ANY(tags)
     """,
-        (cik, accession_number, tags),
+        (cik, accession_number, tag),
     )
     return results
 

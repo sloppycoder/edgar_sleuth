@@ -54,15 +54,15 @@ def get_embeddings(
     cik: str,
     accession_number: str,
     dimension: int,
-    tags: list[str] = [],
+    tag: str,
+    embedding_table_name: str,
     model: str = GEMINI_EMBEDDING_MODEL,
-    embedding_table_name: str = "",
 ) -> int:
     text_chunks_records = get_chunks(
         cik=cik,
         accession_number=accession_number,
         table_name=text_table_name,
-        tags=tags,
+        tag=tag,
     )
     logger.debug(
         f"Retrieved {len(text_chunks_records)} text chunks for {cik} {accession_number}"
@@ -84,7 +84,7 @@ def get_embeddings(
                 accession_number=accession_number,
                 chunks=embeddings,
                 table_name=embedding_table_name,
-                tags=tags,
+                tags=[tag],
                 create_table=True,
             )
         return len(embeddings)

@@ -68,12 +68,9 @@ def enumerate_filings(batch: str, batch_limit: int) -> Iterator[SECFiling]:
             print(f"ERROR: invalid json {line}")
 
 
-# def validate_option(ctx, param, value):
-#     """Callback for conditional validations"""
-#     action = ctx.params.get("action")
-#     if action in ["init", "initdb"] and param == "dimension" and not value:
-#         raise click.BadParameter("--dimension is required when action ")
-#     return value
+def log_n_print(message):
+    print(message)
+    logger.info(message)
 
 
 @click.command()
@@ -106,9 +103,15 @@ chunk will be run before embedding""",
     help="Number of records to process in batch mode, 0 means unlimited",
 )
 @click.option(
-    "--tag",
+    "--tags",
+    "tags_str",
     required=False,
-    help="tag to assocate database records created by the run",
+    help="tag for text chunks and embedding, required when using chunk, embedding and extract",  # noqa: E501
+)
+@click.option(
+    "--search-tag",
+    required=False,
+    help="tag for search phrases, required when using search phrase, i.e. init, extract",
 )
 @click.option(
     "--dimension",
@@ -124,14 +127,34 @@ def main(
     full: bool,
     batch: str,
     batch_limit: int,
-    tag: str,
+    tags_str: str,
+    search_tag: str,
     dimension: int,
 ) -> None:
+    # validate tag values first.
+    if not search_tag and action in ["init", "initdb", "extract"]:
+        raise click.UsageError(
+            "--search-tag is required when search phrase are used, e.g. init, extract"
+        )
+    else:
+        search_tag = search_tag.split(",")[0] if search_tag else ""
+
+    if action in ["embedding", "extract"] and (not tags_str or "," in tags_str):
+        raise click.UsageError(
+            "--tags must be a single tag, without comma, when action is embedding or extract"  # noqa: E501
+        )
+
+    if action in ["chunk"] and not tags_str:
+        raise click.UsageError("--tags is required when action is chunk")
+
+    tags = tags_str.split(",") if tags_str else []
+
+    log_n_print(f"Running {action} with tags {tags} and search tag {search_tag}")
+
     # hard coded values for now
     text_table_name = "filing_text_chunks"
     embedding_table_name = "filing_chunks_embeddings"
     search_phrase_table_name = "search_phrase_embeddings"
-    search_phrase_tag = "gemini_768"
     form_type = "485BPOS"
 
     answer = "no"
@@ -151,7 +174,7 @@ def main(
         create_search_phrase_embeddings(
             search_phrase_table_name,
             model=GEMINI_EMBEDDING_MODEL,
-            tags=[tag, search_phrase_tag],
+            tag=search_tag,
             dimension=dimension,
         )
         return
@@ -168,24 +191,20 @@ def main(
             continue
 
         if n_errors > MAX_ERRORS:
-            print(f"Aborting after reaching max errors: {MAX_ERRORS}")
+            log_n_print(f"Aborting after reaching max errors: {MAX_ERRORS}")
             break
 
         if action == "chunk" or (action in ["extract", "embedding"] and full):
             n_chunks = chunk_filing(
                 filing=filing,
                 form_type=form_type,
-                tags=[tag],
+                tags=tags,
                 table_name=text_table_name,
             )
             if n_chunks > 1:
-                message = f"{filing} {form_type} splitted into {n_chunks} chunks"
-                print(message)
-                logger.info(message)
+                log_n_print(f"{filing} {form_type} splitted into {n_chunks} chunks")
             else:
-                message = f"Error when splitting {filing} {form_type}"
-                print(message)
-                logger.info(message)
+                log_n_print(f"Error when splitting {filing} {form_type}")
                 n_errors += 1
 
         if action == "embedding" or (action in ["extract"] and full):
@@ -193,18 +212,14 @@ def main(
                 text_table_name=text_table_name,
                 cik=filing.cik,
                 accession_number=filing.accession_number,
-                tags=[tag],
+                tag=tags[0],
                 embedding_table_name=embedding_table_name,
                 dimension=dimension,
             )
             if n_chunks > 1:
-                message = f"Saved {n_chunks} embeddings for {filing} {form_type}"
-                print(message)
-                logger.info(message)
+                log_n_print(f"Saved {n_chunks} embeddings for {filing} {form_type}")
             else:
-                message = f"Error when get embeddings for {filing} {form_type}"
-                print(message)
-                logger.info(message)
+                log_n_print(f"Error when get embeddings for {filing} {form_type}")
                 n_errors += 1
 
         if action == "extract":
@@ -215,13 +230,13 @@ def main(
                 text_table_name=text_table_name,
                 embedding_table_name=embedding_table_name,
                 search_phrase_table_name=search_phrase_table_name,
-                embedding_tag=tag,
-                search_phrase_tag=search_phrase_tag,
+                tag=tags[0],
+                search_phrase_tag=search_tag,
                 model=model,
             )
             logger.debug(f"{model} response:{response}")
             n_trustees = len(comp_info["trustees"]) if comp_info else 0
-            print(f"Extracted {n_trustees} from {filing}")
+            log_n_print(f"Extracted {n_trustees} from {filing}")
 
 
 if __name__ == "__main__":
