@@ -84,9 +84,3 @@ ignore = ["E203", "E266"]
 
 [tool.ruff.lint.per-file-ignores]
 "migrations/*.py" = ["E501"] # Ignore line too long for auto-generated migration files
-
-
-[tool.aerich]
-tortoise_orm = "main.TORTOISE_ORM"
-location = "./migrations"
-src_folder = "./."
