@@ -122,7 +122,7 @@ def initialize_search_phrases(table_name: str, data, tags: list[str] = []) -> No
 
     phrases = [phrase for phrase, _ in data]
     execute_query(
-        f"DELETE FROM {table_name} WHERE phrase = ANY(%s) AND tags = %s",
+        f"DELETE FROM {table_name} WHERE tags = %s",
         (phrases, tags),
     )
 
