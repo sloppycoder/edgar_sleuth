@@ -13,10 +13,10 @@ from .llm.extraction import ask_model, extract_json_from_response
 logger = logging.getLogger(__name__)
 
 TRUSTEE_COMP_SEARCH_PHRASES = [
-    "Trustee Compensation",
-    "Independent Director Compensation",
-    "Board Director Compensation",
-    "Interested Person Compensation",
+    "Trustee Compensation Structure and Amount",
+    "Independent Director or Trustee Compensation Table",
+    "Board Director or Intereed Person Compensation Details with Amount",
+    "Interested Person Compensation Remuneration Detailed Amount",
 ]
 
 
