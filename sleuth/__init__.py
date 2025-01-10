@@ -173,7 +173,10 @@ def process_filing_wrapper(args: dict):
 
 def init_worker(logging_q):
     # remove exsiting handlers with QueueHandler
-    root_logger = logging.getLogger()
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logging.getLogger("sleuth").setLevel(logging.DEBUG)
+    logging.getLogger("sleuth.datastore").setLevel(logging.INFO)
     for handler in logger.handlers:
         logger.removeHandler(handler)
-    root_logger.addHandler(QueueHandler(logging_q))
+    logger.addHandler(QueueHandler(logging_q))
