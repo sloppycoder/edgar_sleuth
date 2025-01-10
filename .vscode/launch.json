@@ -12,9 +12,9 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "extract",
+                "chunk",
                 "--batch=@test1.jsonl",
-                "--tag=123"
+                "--tags=test1"
             ]
         },
         {
