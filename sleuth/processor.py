@@ -1,10 +1,12 @@
 import logging
+from datetime import datetime
 from logging.handlers import QueueHandler
 from typing import Any
 
+from .datastore import get_chunks, save_chunks
 from .edgar import SECFiling
-from .llm.embedding import save_filing_embeddings
-from .splitter import chunk_filing
+from .llm.embedding import GEMINI_EMBEDDING_MODEL, batch_embedding
+from .splitter import chunk_text, trim_html_content
 from .trustee import extract_trustee_comp
 
 logger = logging.getLogger(__name__)
@@ -13,6 +15,91 @@ logger = logging.getLogger(__name__)
 def log_n_print(message):
     print(message)
     logger.info(message)
+
+
+def save_filing_embeddings(
+    text_table_name: str,
+    cik: str,
+    accession_number: str,
+    dimension: int,
+    tag: str,
+    embedding_table_name: str,
+    model: str = GEMINI_EMBEDDING_MODEL,
+) -> int:
+    text_chunks_records = get_chunks(
+        cik=cik,
+        accession_number=accession_number,
+        table_name=text_table_name,
+        tag=tag,
+    )
+    logger.debug(
+        f"Retrieved {len(text_chunks_records)} text chunks for {cik} {accession_number}"
+    )
+    chunks = [record["chunk_text"] for record in text_chunks_records]
+
+    start_t = datetime.now()
+    embeddings = batch_embedding(chunks, model=model, dimension=dimension)
+    elapsed_t = datetime.now() - start_t
+    logger.debug(
+        f"batch_embedding of {len(chunks)} chunks of text with {model} took {elapsed_t.total_seconds()} seconds"  # noqa E501
+    )
+
+    if len(embeddings) > 1:
+        if embedding_table_name:
+            logger.debug(f"Saving {len(chunks)} embeddings to {embedding_table_name}")
+            save_chunks(
+                cik=cik,
+                accession_number=accession_number,
+                chunks=embeddings,
+                table_name=embedding_table_name,
+                tags=[tag],
+                create_table=True,
+            )
+        return len(embeddings)
+
+    return 0
+
+
+def chunk_filing(
+    filing: SECFiling,
+    form_type: str,
+    method: str = "spacy",
+    tags: list[str] = [],
+    table_name: str = "",  # leave empty if dryrun
+) -> tuple[int, list[str]]:
+    logger.debug(f"chunk_filing form {form_type} of {filing}")
+
+    if filing:
+        filing_path, filing_content = filing.get_doc_content(form_type, max_items=1)[0]
+
+        if not filing_path.endswith(".html") and not filing_path.endswith(".htm"):
+            logger.info(f"{filing_path} is not html file, skipping...")
+            return 0, []
+
+        trimmed_html = trim_html_content(filing_content)
+        logger.debug(f"Trimmed HTML content size {len(trimmed_html)}")
+
+        start_t = datetime.now()
+        chunks = chunk_text(trimmed_html, method=method)
+        elapsed_t = datetime.now() - start_t
+        logger.debug(
+            f"chunking with {len(filing_content)} of text with {method} took {elapsed_t.total_seconds()} seconds"  # noqa E501
+        )
+
+        if len(chunks) > 1:
+            if table_name:
+                logger.debug(f"Saving {len(chunks)} text chunks to {table_name}")
+                save_chunks(
+                    cik=filing.cik,
+                    accession_number=filing.accession_number,
+                    chunks=chunks,
+                    table_name=table_name,
+                    tags=tags,
+                    create_table=True,
+                )
+            return len(chunks), chunks
+
+    return 0, []
 
 
 def process_filing(

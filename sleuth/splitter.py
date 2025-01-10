@@ -1,58 +1,12 @@
 import logging
-from datetime import datetime
 
 import html2text
 import spacy
 from bs4 import BeautifulSoup
 
-from .datastore import save_chunks
-from .edgar import SECFiling
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_TEXT_CHUNK_SIZE = 3500
-
-
-def chunk_filing(
-    filing: SECFiling,
-    form_type: str,
-    method: str = "spacy",
-    tags: list[str] = [],
-    table_name: str = "",  # leave empty if dryrun
-) -> tuple[int, list[str]]:
-    logger.debug(f"chunk_filing form {form_type} of {filing}")
-
-    if filing:
-        filing_path, filing_content = filing.get_doc_content(form_type, max_items=1)[0]
-
-        if not filing_path.endswith(".html") and not filing_path.endswith(".htm"):
-            logger.info(f"{filing_path} is not html file, skipping...")
-            return 0, []
-
-        trimmed_html = _trim_html_content(filing_content)
-        logger.debug(f"Trimmed HTML content size {len(trimmed_html)}")
-
-        start_t = datetime.now()
-        chunks = chunk_text(trimmed_html, method=method)
-        elapsed_t = datetime.now() - start_t
-        logger.debug(
-            f"chunking with {len(filing_content)} of text with {method} took {elapsed_t.total_seconds()} seconds"  # noqa E501
-        )
-
-        if len(chunks) > 1:
-            if table_name:
-                logger.debug(f"Saving {len(chunks)} text chunks to {table_name}")
-                save_chunks(
-                    cik=filing.cik,
-                    accession_number=filing.accession_number,
-                    chunks=chunks,
-                    table_name=table_name,
-                    tags=tags,
-                    create_table=True,
-                )
-            return len(chunks), chunks
-
-    return 0, []
 
 
 def chunk_text(
@@ -122,7 +76,7 @@ def _chunk_text_by_spacy(content: str, chunk_size: int) -> list[str]:
     return [chunk for chunk in chunks if chunk.strip() and len(chunk.strip()) > 100]
 
 
-def _trim_html_content(content: str) -> str:
+def trim_html_content(content: str) -> str:
     """
     remove the hidden div and convert the rest of html into text
     """
