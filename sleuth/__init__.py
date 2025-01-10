@@ -161,15 +161,15 @@ def process_filing_wrapper(args: dict):
     # wrapper for multiprocessing
     # init logging for each worker to use QueueHandler that sends the logs
     # to the main process
-    process_filing(**args)
+    try:
+        process_filing(**args)
+    except Exception as e:
+        logger.error(f"Error {str(e)} in process_filing: {args["filing"]}")
 
 
 def init_worker(logging_q):
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
-    logger.addHandler(QueueHandler(logging_q))
+    # remove exsiting handlers with QueueHandler
+    root_logger = logging.getLogger()
     for handler in logger.handlers:
-        if isinstance(handler, logging.StreamHandler):
-            print("CHILD: Removing StreamHandler...")
-            logger.removeHandler(handler)
-            break
+        logger.removeHandler(handler)
+    root_logger.addHandler(QueueHandler(logging_q))
