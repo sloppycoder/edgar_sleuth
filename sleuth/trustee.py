@@ -1,7 +1,11 @@
 import logging
 from datetime import datetime
 
-from .datastore import execute_query, initialize_search_phrases
+from .datastore import (
+    get_chunks,
+    initialize_search_phrases_table,
+    relevant_chunks_with_distances,
+)
 from .llm.algo import (
     gather_chunk_distances,
     most_relevant_chunks,
@@ -85,61 +89,7 @@ def create_search_phrase_embeddings(
         dimension=dimension,
     )
     data = list(zip(TRUSTEE_COMP_SEARCH_PHRASES, embeddings))
-    initialize_search_phrases(table_name=table_name, data=data, tags=[tag])
-
-
-def get_relevant_chunks_with_distances(
-    cik: str,
-    accession_number: str,
-    embedding_table_name: str,
-    search_phrase_table_name: str,
-    search_phrase_tag: str,
-    embedding_tag: str,
-):
-    # limit 12 is like top_k =3 for 4 search phrases
-    result = execute_query(
-        f"""
-        SELECT
-            cik, accession_number, phrase, chunk_num,
-            embedding <=> phrase_embedding as distance
-        FROM
-            {search_phrase_table_name} phrases,
-            {embedding_table_name} docs
-        WHERE
-            cik = %s AND accession_number = %s
-            AND %s = ANY(phrases.tags) AND %s = ANY(docs.tags)
-            ORDER BY
-                embedding <=> phrase_embedding
-            limit 12;
-    """,
-        (cik, accession_number, search_phrase_tag, embedding_tag),
-    )
-    return result
-
-
-def get_text_by_chunk_num(
-    text_table_name: str,
-    cik: str,
-    accession_number: str,
-    chunk_nums: list[int],
-    tag: str,
-) -> str:
-    result = execute_query(
-        f"""
-        SELECT
-            STRING_AGG(chunk_text, '\n' ORDER BY chunk_num) as relevant_text
-        FROM
-            {text_table_name}
-        WHERE
-            cik = %s AND accession_number = %s
-            AND %s = ANY(tags) AND chunk_num = ANY(%s)
-    """,
-        (cik, accession_number, tag, chunk_nums),
-    )
-    if result:
-        return result[0]["relevant_text"]
-    else:
-        return ""
+    initialize_search_phrases_table(table_name=table_name, data=data, tags=[tag])
 
 
 def find_relevant_text(
@@ -151,7 +101,7 @@ def find_relevant_text(
     tag: str,
     search_phrase_tag: str,
 ) -> str:
-    relevance_result = get_relevant_chunks_with_distances(
+    relevance_result = relevant_chunks_with_distances(
         cik=cik,
         accession_number=accession_number,
         embedding_table_name=embedding_table_name,
@@ -165,15 +115,16 @@ def find_relevant_text(
     selected_chunks = [int(s) for s in most_relevant_chunks(relevance_scores)]
     logger.debug(f"Selected chunks: {selected_chunks}")
 
-    relevant_text = get_text_by_chunk_num(
+    results = get_chunks(
+        table_name=text_table_name,
         cik=cik,
         accession_number=accession_number,
-        chunk_nums=selected_chunks,
-        text_table_name=text_table_name,
         tag=tag,
+        chunk_nums=selected_chunks,
     )
-    if relevant_text and len(relevant_text) > 100:
-        return relevant_text
+
+    if results and len(results) == len(selected_chunks):
+        return "\n".join([row["chunk_text"] for row in results])
     else:
         return ""
 

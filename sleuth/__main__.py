@@ -10,10 +10,10 @@ from typing import Iterator
 import click
 import yaml
 
-from . import init_worker, log_n_print, process_filing, process_filing_wrapper
 from .datastore import execute_query
-from .edgar import SECFiling
+from .edgar import SECFiling, parse_idx_filename
 from .llm.embedding import GEMINI_EMBEDDING_MODEL
+from .processor import init_worker, process_filing, process_filing_wrapper
 from .trustee import create_search_phrase_embeddings
 
 MAX_ERRORS = 5
@@ -35,7 +35,7 @@ def create_filing(
         return SECFiling(cik=cik, accession_number=accession_number)
 
 
-def enumerate_filings(batch: str, batch_limit: int) -> Iterator[SECFiling]:
+def enumerate_filings(batch: str, batch_limit: int) -> Iterator[tuple[str, str]]:
     if batch.startswith("@"):
         with open(batch[1:], "r") as f:
             lines = f.readlines()
@@ -57,13 +57,10 @@ def enumerate_filings(batch: str, batch_limit: int) -> Iterator[SECFiling]:
             entry = json.loads(line)
             if entry.get("idx_filename"):
                 n_processed += 1
-                yield SECFiling(idx_filename=entry["idx_filename"])
+                yield parse_idx_filename(entry["idx_filename"])
             elif entry.get("cik") and entry.get("accession_number"):
                 n_processed += 1
-                yield SECFiling(
-                    cik=entry["cik"],
-                    accession_number=entry["accession_number"],
-                )
+                yield entry["cik"], entry["accession_number"]
             else:
                 print(f"ERROR: Ignored invalid entry: {entry}")
         except json.JSONDecodeError:
@@ -153,7 +150,7 @@ def main(
 
     tags = tags_str.split(",") if tags_str else []
 
-    log_n_print(f"Running {action} with tags {tags} and search tag {search_tag}")
+    print(f"Running {action} with tags {tags} and search tag {search_tag}")
 
     # hard coded values for now
     text_table_name = "filing_text_chunks"
@@ -191,16 +188,17 @@ def main(
             actions = ["chunk", "embedding", "extract"]
 
     if dryrun or workers == 1:
-        for filing in enumerate_filings(batch, batch_limit):
+        for cik, accession_number in enumerate_filings(batch, batch_limit):
             if dryrun:
-                print(filing)
+                print("Processing Filing({cik},{accession_number})")
                 continue
 
             process_filing(
                 actions=actions,
                 search_tag=search_tag,
                 dimension=dimension,
-                filing=filing,
+                cik=cik,
+                accession_number=accession_number,
                 tags=tags,
                 model="gemini-1.5-flash-002",
                 text_table_name=text_table_name,
@@ -233,7 +231,14 @@ def main(
         q_listener = QueueListener(logging_q, handler)
         q_listener.start()
 
-        with multiprocessing.Pool(workers, init_worker, (logging_q,)) as pool:
+        with multiprocessing.Pool(
+            workers,
+            init_worker,
+            (
+                logging_q,
+                logging.DEBUG,
+            ),
+        ) as pool:
             pool.map(process_filing_wrapper, args)
 
         q_listener.stop()

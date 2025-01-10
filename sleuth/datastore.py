@@ -9,43 +9,68 @@ import config
 
 logger = logging.getLogger(__name__)
 
-sql_select_regex = re.compile(r"\bSELECT\b.*?\bFROM\b", re.DOTALL | re.IGNORECASE)
-
-
-def _gen_create_statement(table_name: str, dimension: int = 0) -> str:
-    if table_name.startswith("filing_text_chunks"):
-        return f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            cik VARCHAR(10) NOT NULL,
-            accession_number VARCHAR(20) NOT NULL,
-            chunk_num INTEGER NOT NULL,
-            chunk_text TEXT NOT NULL,
-            tags TEXT[])
-        """
-    elif table_name.startswith("filing_chunks_embeddings"):
-        return f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            cik VARCHAR(10) NOT NULL,
-            accession_number VARCHAR(20) NOT NULL,
-            chunk_num INTEGER NOT NULL,
-            embedding VECTOR ({dimension}) NOT NULL,
-            tags TEXT[])
-        """
-    elif table_name.startswith("search_phrase_embeddings"):
-        return f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            phrase VARCHAR(255) PRIMARY KEY,
-            phrase_embedding VECTOR({dimension}),
-            tags TEXT[]
-        )"""
-    else:
-        raise ValueError(f"Do not know how to create table {table_name}")
+_sql_select_regex = re.compile(r"\bSELECT\b.*?\bFROM\b", re.DOTALL | re.IGNORECASE)
 
 
 # use lru_cache to make a singleton
 @lru_cache(maxsize=1)
 def _conn() -> psycopg.Connection:
     return psycopg.connect(config.database_url)
+
+
+def relevant_chunks_with_distances(
+    cik: str,
+    accession_number: str,
+    embedding_table_name: str,
+    search_phrase_table_name: str,
+    search_phrase_tag: str,
+    embedding_tag: str,
+    limit: int = 1000,
+):
+    """
+    Perform a vector search and return the most relevent chunks numbers
+    along with their distance
+    """
+    result = execute_query(
+        f"""
+        SELECT
+            cik, accession_number, phrase, chunk_num,
+            embedding <=> phrase_embedding as distance
+        FROM
+            {search_phrase_table_name} phrases,
+            {embedding_table_name} docs
+        WHERE
+            cik = %s AND accession_number = %s
+            AND %s = ANY(phrases.tags) AND %s = ANY(docs.tags)
+            ORDER BY
+                embedding <=> phrase_embedding
+            limit {limit};
+    """,
+        (cik, accession_number, search_phrase_tag, embedding_tag),
+    )
+    return result
+
+
+def get_chunks(
+    cik: str,
+    accession_number: str,
+    table_name: str,
+    tag: str,
+    chunk_nums: list[int] = [],
+) -> list[dict[str, Any]]:
+    col = "embeddings" if "embedding" in table_name else "chunk_text"
+
+    query = f"""
+        SELECT cik, accession_number, chunk_num, {col}
+        FROM {table_name}
+        WHERE cik = %s AND accession_number = %s AND %s = ANY(tags)
+    """
+    params = (cik, accession_number, tag)
+    if chunk_nums:
+        query += " AND chunk_num = ANY(%s)"
+        params += (chunk_nums,)
+
+    return execute_query(query + " ORDER BY chunk_num", params)
 
 
 def save_chunks(
@@ -99,23 +124,7 @@ def save_chunks(
     _conn().commit()
 
 
-def get_chunks(
-    cik: str, accession_number: str, table_name: str, tag: str
-) -> list[dict[str, Any]]:
-    col = "embeddings" if "embedding" in table_name else "chunk_text"
-
-    results = execute_query(
-        f"""
-        SELECT cik, accession_number, chunk_num, {col}
-        FROM {table_name}
-        WHERE cik = %s AND accession_number = %s AND %s = ANY(tags)
-    """,
-        (cik, accession_number, tag),
-    )
-    return results
-
-
-def initialize_search_phrases(table_name: str, data, tags: list[str] = []) -> None:
+def initialize_search_phrases_table(table_name: str, data, tags: list[str] = []) -> None:
     dimension = len(data[0][1])
     statement = _gen_create_statement(table_name, dimension=dimension)
     _conn().execute(statement)  # pyright: ignore
@@ -139,11 +148,11 @@ def initialize_search_phrases(table_name: str, data, tags: list[str] = []) -> No
 
 def execute_query(query, params=None) -> list[dict[str, Any]]:
     result = []
-    try:
-        with _conn().cursor() as cur:
-            logger.debug(f"Executing query: {query}\nwith parameters: {params}")
+    with _conn().cursor() as cur:
+        logger.debug(f"Executing query: {query}\nwith parameters: {params}")
 
-            if sql_select_regex.search(query):
+        try:
+            if _sql_select_regex.search(query):
                 # it's a select
                 cur.execute(query, params)
                 rows = cur.fetchall()
@@ -153,9 +162,41 @@ def execute_query(query, params=None) -> list[dict[str, Any]]:
                 # it's not a select
                 cur.execute(query, params)
                 _conn().commit()
-    except psycopg.errors.SyntaxError as e:
-        logger.info(f"Syntax error: {str(e)} {query}")
-    except psycopg.Error as e:
-        logger.info(f"Database error: {e} when executing {query}")
+
+        except psycopg.errors.SyntaxError as e:
+            logger.info(f"Syntax error: {str(e)} {query}")
+        except psycopg.Error as e:
+            logger.info(f"Database error: {e} when executing {query}")
+            _conn().rollback()
 
     return result
+
+
+def _gen_create_statement(table_name: str, dimension: int = 0) -> str:
+    if table_name.startswith("filing_text_chunks"):
+        return f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            cik VARCHAR(10) NOT NULL,
+            accession_number VARCHAR(20) NOT NULL,
+            chunk_num INTEGER NOT NULL,
+            chunk_text TEXT NOT NULL,
+            tags TEXT[])
+        """
+    elif table_name.startswith("filing_chunks_embeddings"):
+        return f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            cik VARCHAR(10) NOT NULL,
+            accession_number VARCHAR(20) NOT NULL,
+            chunk_num INTEGER NOT NULL,
+            embedding VECTOR ({dimension}) NOT NULL,
+            tags TEXT[])
+        """
+    elif table_name.startswith("search_phrase_embeddings"):
+        return f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            phrase VARCHAR(255) PRIMARY KEY,
+            phrase_embedding VECTOR({dimension}),
+            tags TEXT[]
+        )"""
+    else:
+        raise ValueError(f"Do not know how to create table {table_name}")

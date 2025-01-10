@@ -1,14 +1,63 @@
+import logging
+from datetime import datetime
+
 import httpx
 import tiktoken
 from google.api_core.exceptions import GoogleAPICallError, ServerError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from vertexai.language_models import TextEmbeddingInput, TextEmbeddingModel
 
+from ..datastore import get_chunks, save_chunks
 from .util import init_vertaxai, openai_client
 
 # models used for embeddings
 OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
 GEMINI_EMBEDDING_MODEL = "text-embedding-005"
+
+logger = logging.getLogger(__name__)
+
+
+def save_filing_embeddings(
+    text_table_name: str,
+    cik: str,
+    accession_number: str,
+    dimension: int,
+    tag: str,
+    embedding_table_name: str,
+    model: str = GEMINI_EMBEDDING_MODEL,
+) -> int:
+    text_chunks_records = get_chunks(
+        cik=cik,
+        accession_number=accession_number,
+        table_name=text_table_name,
+        tag=tag,
+    )
+    logger.debug(
+        f"Retrieved {len(text_chunks_records)} text chunks for {cik} {accession_number}"
+    )
+    chunks = [record["chunk_text"] for record in text_chunks_records]
+
+    start_t = datetime.now()
+    embeddings = batch_embedding(chunks, model=model, dimension=dimension)
+    elapsed_t = datetime.now() - start_t
+    logger.debug(
+        f"batch_embedding of {len(chunks)} chunks of text with {model} took {elapsed_t.total_seconds()} seconds"  # noqa E501
+    )
+
+    if len(embeddings) > 1:
+        if embedding_table_name:
+            logger.debug(f"Saving {len(chunks)} embeddings to {embedding_table_name}")
+            save_chunks(
+                cik=cik,
+                accession_number=accession_number,
+                chunks=embeddings,
+                table_name=embedding_table_name,
+                tags=[tag],
+                create_table=True,
+            )
+        return len(embeddings)
+
+    return 0
 
 
 def batch_embedding(
