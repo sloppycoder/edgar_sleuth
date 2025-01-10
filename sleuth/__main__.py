@@ -228,7 +228,7 @@ def main(
         # https://stackoverflow.com/questions/641420/how-should-i-log-while-using-multiprocessing-in-python
         logging_q = multiprocessing.Queue()
         handler = logging.getHandlerByName("console")  # defined in logger_config.yaml
-        q_listener = QueueListener(logging_q, handler)
+        q_listener = QueueListener(logging_q, handler)  # pyright: ignore
         q_listener.start()
 
         with multiprocessing.Pool(
