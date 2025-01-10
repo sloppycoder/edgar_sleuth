@@ -4,8 +4,6 @@ import html2text
 import spacy
 from bs4 import BeautifulSoup
 
-from .edgar import edgar_file
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_TEXT_CHUNK_SIZE = 3500
@@ -75,14 +73,13 @@ def chunk_text_by_spacy(content: str, chunk_size: int) -> list[str]:
         chunks.append("\n\n".join(current_chunk))
 
     # Remove empty chunks
-    return [chunk for chunk in chunks if chunk.strip()]
+    return [chunk for chunk in chunks if chunk.strip() and len(chunk.strip()) > 100]
 
 
-def trim_html_content(filing_html_path: str) -> str:
+def trim_html_content(content: str) -> str:
     """
     remove the hidden div and convert the rest of html into text
     """
-    content = edgar_file(filing_html_path)
     if not content:
         return ""
 

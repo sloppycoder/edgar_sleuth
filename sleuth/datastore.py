@@ -81,7 +81,7 @@ def save_chunks(
         (
             cik,
             accession_number,
-            chunk_num + 1,
+            chunk_num,
             text_or_embedding,
             tags,
         )

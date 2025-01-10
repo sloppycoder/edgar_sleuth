@@ -5,7 +5,7 @@ from logging.handlers import QueueHandler
 from .datastore import get_chunks, save_chunks
 from .edgar import SECFiling
 from .llm.embedding import GEMINI_EMBEDDING_MODEL, batch_embedding
-from .splitter import chunk_text, default_text_converter
+from .splitter import chunk_text, trim_html_content
 from .trustee import extract_trustee_comp
 
 __version__ = "0.1.0"
@@ -25,11 +25,15 @@ def chunk_filing(
     if filing:
         filing_path, filing_content = filing.get_doc_content(form_type, max_items=1)[0]
 
-        if filing_path.endswith(".html") or filing_path.endswith(".htm"):
-            filing_content = default_text_converter().handle(filing_content)
+        if not filing_path.endswith(".html") and not filing_path.endswith(".htm"):
+            logger.info(f"{filing_path} is not html file, skipping...")
+            return 0
+
+        trimmed_html = trim_html_content(filing_content)
+        logger.debug(f"Trimmed HTML content size {len(trimmed_html)}")
 
         start_t = datetime.now()
-        chunks = chunk_text(filing_content, method=method)
+        chunks = chunk_text(trimmed_html, method=method)
         elapsed_t = datetime.now() - start_t
         logger.debug(
             f"chunking with {len(filing_content)} of text with {method} took {elapsed_t.total_seconds()} seconds"  # noqa E501

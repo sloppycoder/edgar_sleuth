@@ -44,7 +44,7 @@ def test_fully_process_one_filing(clean_db):
         tags=[tag],
         table_name=text_table_name,
     )
-    assert n_chunks == 272
+    assert n_chunks == 271
 
     # step 2: get embedding
     n_embeddings = get_embeddings(
