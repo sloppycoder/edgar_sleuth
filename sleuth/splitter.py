@@ -74,7 +74,8 @@ def chunk_text_by_spacy(content: str, chunk_size: int) -> list[str]:
     if current_chunk:
         chunks.append("\n\n".join(current_chunk))
 
-    return chunks
+    # Remove empty chunks
+    return [chunk for chunk in chunks if chunk.strip()]
 
 
 def trim_html_content(filing_html_path: str) -> str:
