@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 _sql_select_regex = re.compile(r"\bSELECT\b.*?\bFROM\b", re.DOTALL | re.IGNORECASE)
 
 
+class DatabaseException(Exception):
+    pass
+
+
 # use lru_cache to make a singleton
 @lru_cache(maxsize=1)
 def _conn() -> psycopg.Connection:
@@ -143,9 +147,11 @@ def execute_query(query, params=None) -> list[dict[str, Any]]:
 
         except psycopg.errors.SyntaxError as e:
             logger.info(f"Syntax error: {str(e)} {query}")
+            raise DatabaseException from e
         except psycopg.Error as e:
             logger.info(f"Database error: {e} when executing {query}")
             _conn().rollback()
+            raise DatabaseException from e
 
     return result
 
@@ -178,9 +184,11 @@ def execute_insertmany(
         return True
     except psycopg.errors.SyntaxError as e:
         logger.info(f"Syntax error: {str(e)} {query}")
+        raise DatabaseException from e
     except psycopg.Error as e:
         logger.info(f"Database error: {e} when executing {query}")
         _conn().rollback()
+        raise DatabaseException from e
 
     return False
 
