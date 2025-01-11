@@ -225,6 +225,8 @@ def _create_table(table_name: str, dimension: int = 0):
             cik VARCHAR(10) NOT NULL,
             accession_number VARCHAR(20) NOT NULL,
             model VARCHAR(32) NOT NULL,
+            selected_chunks INT[] NOT NULL,
+            selected_text TEXT NOT NULL,
             response TEXT NOT NULL,
             comp_info JSONB,
             n_trustees INTEGER,

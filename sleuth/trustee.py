@@ -1,5 +1,7 @@
+import json
 import logging
 from datetime import datetime
+from typing import Any
 
 from .datastore import (
     execute_insertmany,
@@ -10,6 +12,7 @@ from .datastore import (
 from .llm.algo import (
     gather_chunk_distances,
     most_relevant_chunks,
+    relevance_by_appearance,
     relevance_by_distance,
 )
 from .llm.embedding import batch_embedding
@@ -114,7 +117,7 @@ def extract_trustee_comp(
     search_phrase_tag: str,
     tag: str,
     model: str,
-) -> tuple[str | None, dict | None]:
+) -> dict[str, Any] | None:
     # the extractino process has 4 steps
     # step 1: chunk the filing
     # step 2: get embedding
@@ -122,7 +125,7 @@ def extract_trustee_comp(
 
     # step 3: using search phrases to run vector search
     # use scoring alborithm to determine the most relevant text chunks
-    relevant_text = _find_relevant_text(
+    relevant_chunks, relevant_text = _find_relevant_text(
         cik=cik,
         accession_number=accession_number,
         text_table_name=text_table_name,
@@ -130,18 +133,29 @@ def extract_trustee_comp(
         search_phrase_table_name=search_phrase_table_name,
         tag=tag,
         search_phrase_tag=search_phrase_tag,
+        method="distance",
     )
-    if not relevant_text or len(relevant_text) < 100:
-        logger.info(
-            f"No relevant text found for {cik},{accession_number} with tags {search_phrase_tag} and {tag}"  # noqa E501
-        )
+    if relevant_text and len(relevant_text) > 100:
+        # step 4: send the relevant text to the LLM model with designed prompt
+        response, comp_info = _ask_model_about_trustee_comp(model, relevant_text)
+        if response and comp_info:
+            n_trustees = len(comp_info["trustees"]) if comp_info else 0
+            return {
+                "cik": cik,
+                "accession_number": accession_number,
+                "model": model,
+                "tags": [tag],
+                "response": response,
+                "comp_info": json.dumps(comp_info),
+                "n_trustees": n_trustees,
+                "selected_chunks": relevant_chunks,
+                "seleted_text": relevant_text,
+            }
 
-    # step 4: send the relevant text to the LLM model with designed prompt
-    response, comp_info = _ask_model_about_trustee_comp(model, relevant_text)
-    if response and comp_info:
-        return response, comp_info
-
-    return None, None
+    logger.info(
+        f"No relevant text found for {cik},{accession_number} with tags {search_phrase_tag} and {tag}"  # noqa E501
+    )
+    return None
 
 
 def _find_relevant_text(
@@ -152,7 +166,8 @@ def _find_relevant_text(
     search_phrase_table_name: str,
     tag: str,
     search_phrase_tag: str,
-) -> str:
+    method: str = "distance",
+) -> tuple[list[int], str]:
     relevance_result = relevant_chunks_with_distances(
         cik=cik,
         accession_number=accession_number,
@@ -160,10 +175,18 @@ def _find_relevant_text(
         search_phrase_table_name=search_phrase_table_name,
         search_phrase_tag=search_phrase_tag,
         embedding_tag=tag,
+        limit=12,  # 3 records each for 4 search phrases
     )
 
+    if not relevance_result:
+        return [], ""
+
     chunk_distances = gather_chunk_distances(relevance_result)
-    relevance_scores = relevance_by_distance(chunk_distances)
+    if method == "distance":
+        relevance_scores = relevance_by_distance(chunk_distances)
+    else:
+        relevance_scores = relevance_by_appearance(chunk_distances)
+
     selected_chunks = [int(s) for s in most_relevant_chunks(relevance_scores)]
     logger.debug(f"Selected chunks: {selected_chunks}")
 
@@ -176,9 +199,9 @@ def _find_relevant_text(
     )
 
     if results and len(results) == len(selected_chunks):
-        return "\n".join([row["chunk_text"] for row in results])
+        return selected_chunks, "\n".join([row["chunk_text"] for row in results])
     else:
-        return ""
+        return [], ""
 
 
 def _ask_model_about_trustee_comp(model: str, relevant_text: str):

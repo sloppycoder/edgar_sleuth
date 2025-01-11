@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime
 from logging.handlers import QueueHandler
@@ -155,7 +154,7 @@ def process_filing(
             log_n_print(f"Error when get embeddings for {key} {form_type}")
 
     if "extract" in actions:
-        response, comp_info = extract_trustee_comp(
+        extraction_result = extract_trustee_comp(
             cik=cik,
             accession_number=accession_number,
             text_table_name=text_table_name,
@@ -165,32 +164,23 @@ def process_filing(
             search_phrase_tag=search_tag,
             model=model,
         )
-        # logger.debug(f"{model} response:{response}")
-        n_trustees = len(comp_info["trustees"]) if comp_info else 0
-        log_n_print(f"Extracted {n_trustees} from {key}")
 
-        ret_val["response"] = response
-        ret_val["comp_info"] = comp_info
+        if extraction_result:
+            # logger.debug(f"{model} response:{response}")
+            log_n_print(f"Extracted {extraction_result["n_trustees"]} from {key}")
 
-        result_saved = execute_insertmany(
-            table_name=trustee_comp_result_tablen_name,
-            data=[
-                {
-                    "cik": cik,
-                    "accession_number": accession_number,
-                    "model": model,
-                    "tags": tags,
-                    "response": response,
-                    "comp_info": json.dumps(comp_info),
-                    "n_trustees": n_trustees,
-                }
-            ],
-            create_table=True,
-        )
+            ret_val["n_trustees"] = extraction_result["n_trustees"]
 
-        ret_val["result_saved"] = result_saved
-        if not result_saved:
-            log_n_print(f"Error when saving {key} trustee comp result")
+            result_saved = execute_insertmany(
+                table_name=trustee_comp_result_tablen_name,
+                data=[extraction_result],
+                create_table=True,
+            )
+
+            ret_val["result_saved"] = result_saved
+
+            if not result_saved:
+                log_n_print(f"Error when saving {key} trustee comp result")
 
     return ret_val
 
@@ -202,7 +192,9 @@ def process_filing_wrapper(args: dict):
     try:
         process_filing(**args)
     except Exception as e:
-        logger.error(f"Error {str(e)} in process_filing: {args["filing"]}")
+        logger.error(
+            f"Error {str(e)} in process_filing: Filing({args["cik"]},{args["accession_number"]})"  # noqa E501
+        )
 
 
 def init_worker(logging_q, log_level=logging.DEBUG):
