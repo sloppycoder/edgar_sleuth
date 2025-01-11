@@ -3,6 +3,8 @@ import logging
 import os
 from typing import Any, Optional
 
+from google.api_core.exceptions import ResourceExhausted
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from vertexai.generative_models import GenerativeModel
 
 from .util import init_vertaxai, openai_client
@@ -37,16 +39,20 @@ def extract_json_from_response(response: str) -> dict[str, Any]:
     # the response should be a JSON
     # sometimes Gemini wraps it in a markdown block ```json ...```
     # so we unrap the markdown block and get to the json
-    if len(response) > 10:
-        start_markdown_index = response.find("```json")
-        end_markdown__index = response.rfind("```")
-        if start_markdown_index >= 0 and end_markdown__index >= 0:
-            try:
-                return json.loads(
-                    response[start_markdown_index + 7 : end_markdown__index]
-                )
-            except json.JSONDecodeError:
-                logger.warning("Failed to parse JSON from response")
+    if len(response) < 20:
+        return {}
+
+    json_str = response.strip()
+    start_markdown_index = response.find("```json")
+    end_markdown__index = response.rfind("```")
+    if start_markdown_index >= 0 and end_markdown__index >= 0:
+        json_str = response[start_markdown_index + 7 : end_markdown__index]
+
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        logger.warning("Failed to parse JSON from response")
+
     return {}
 
 
@@ -64,10 +70,15 @@ def _chat_with_gpt(model_name: str, prompt: str) -> Optional[str]:
         return response.choices[0].message.content
 
     except Exception as e:
-        logging.warning(f"Error calling OpenAI API: {str(e)}")
+        logging.warning(f"Error calling OpenAI API: {type(e)},{str(e)}")
         return None
 
 
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type(ResourceExhausted),
+)
 def _chat_with_gemini(model_name: str, prompt: str) -> Optional[str]:
     try:
         init_vertaxai()
@@ -81,6 +92,9 @@ def _chat_with_gemini(model_name: str, prompt: str) -> Optional[str]:
             },
         )
         return response.text
+    except ResourceExhausted:
+        # for tenacity to retry
+        raise
     except Exception as e:
-        logging.warning(f"Error calling Google Gemini API: {str(e)}")
+        logging.warning(f"Error calling Gemini API: {type(e)},{str(e)}")
         return None
