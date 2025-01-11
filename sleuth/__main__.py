@@ -216,15 +216,17 @@ def main(
                 "actions": actions,
                 "search_tag": search_tag,
                 "dimension": dimension,
-                "filing": filing,
+                "cik": cik,
+                "accession_number": accession_number,
                 "tags": tags,
                 "model": "gemini-1.5-flash-002",
                 "text_table_name": text_table_name,
                 "embedding_table_name": embedding_table_name,
                 "search_phrase_table_name": search_phrase_table_name,
                 "form_type": form_type,
+                "trustee_comp_result_tablen_name": trustee_comp_result_tablen_name,
             }
-            for filing in all_filings
+            for cik, accession_number in all_filings
         ]
 
         # create a queue to receive log messages from worker processes
