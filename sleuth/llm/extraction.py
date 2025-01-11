@@ -9,7 +9,7 @@ from .util import init_vertaxai, openai_client
 
 logger = logging.getLogger(__name__)
 
-_DUMMY_RESPONSE = f"""```json
+_DUMMY_RESPONSE = """```json
 {
     "notes":"extraction skippped",
     "trustees":[],

@@ -149,7 +149,7 @@ def extract_trustee_comp(
                 "comp_info": json.dumps(comp_info),
                 "n_trustees": n_trustees,
                 "selected_chunks": relevant_chunks,
-                "seleted_text": relevant_text,
+                "selected_text": relevant_text,
             }
 
     logger.info(

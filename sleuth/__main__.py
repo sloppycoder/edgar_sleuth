@@ -50,7 +50,6 @@ def enumerate_filings(batch: str, batch_limit: int) -> Iterator[tuple[str, str]]
     n_processed = 0
     for line in lines:
         if batch_limit and n_processed >= batch_limit:
-            print(f"Reached batch limit of {batch_limit}")
             break
 
         try:
