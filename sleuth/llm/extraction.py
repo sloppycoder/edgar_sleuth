@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from typing import Any, Optional
 
 from vertexai.generative_models import GenerativeModel
@@ -8,8 +9,22 @@ from .util import init_vertaxai, openai_client
 
 logger = logging.getLogger(__name__)
 
+_DUMMY_RESPONSE = f"""```json
+{
+    "notes":"extraction skippped",
+    "trustees":[],
+    "compensation_info_present":false
+ }
+```
+"""
+
 
 def ask_model(model: str, prompt: str) -> Optional[str]:
+    # provides a mechanism to skip asking the model
+    # in case it's not need for testing and saves cost
+    if os.environ.get("SKIP_ASK_MODEL", "0") == "1":
+        return _DUMMY_RESPONSE
+
     if model.startswith("gemini"):
         return _chat_with_gemini(model, prompt)
     elif model.startswith("gpt"):
