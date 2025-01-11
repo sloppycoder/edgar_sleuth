@@ -1,9 +1,9 @@
 import random
 
 from sleuth.datastore import (
+    execute_insertmany,
     execute_query,
     get_chunks,
-    initialize_search_phrases_table,
     save_chunks,
 )
 
@@ -71,18 +71,17 @@ def test_save_embedding_chunks(clean_db):
     )
 
 
-def test_initialize_search_phrases(clean_db):
-    dimension = 256
-    search_phrase_table_name = "search_phrase_embeddings_tmp"
-    random_data = [
-        ("The quick brown", _rand_vec(dimension)),
-        ("A wizard's job", _rand_vec(dimension)),
+def test_execute_insertmany(clean_db):
+    table_name = "some_funny_table"
+    data = [
+        {"n_trustee": 1, "cik": "1343", "accession_number": "0001111111-88-666666"},
+        {"n_trustee": 2, "cik": "1344", "accession_number": "1111111111-22-333333"},
+        {"n_trustee": 9, "cik": "8888", "accession_number": "8888888888-88-888888"},
     ]
-    initialize_search_phrases_table(
-        table_name=search_phrase_table_name,
-        tags=["pytest"],
-        data=random_data,
+    execute_query(
+        f"create table {table_name} (n_trustee int, cik text, accession_number text)"
     )
+    assert execute_insertmany(table_name=table_name, data=data, create_table=False)
 
 
 def test_relevant_chunks_with_distances(clean_db):

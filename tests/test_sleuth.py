@@ -30,6 +30,7 @@ def test_process_filing(clean_db):
     tag = "pytest"
     search_tag = f"pytest_gemini_{dimension}"
     model = "gemini-1.5-flash-002"
+    trustee_comp_result_tablen_name = "trustee_comp_results"
 
     # simple filing
     cik = "1002427"
@@ -55,6 +56,7 @@ def test_process_filing(clean_db):
         form_type=form_type,
         model=model,
         search_tag=search_tag,
+        trustee_comp_result_tablen_name=trustee_comp_result_tablen_name,
     )
 
     assert result

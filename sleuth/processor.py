@@ -1,9 +1,10 @@
+import json
 import logging
 from datetime import datetime
 from logging.handlers import QueueHandler
 from typing import Any
 
-from .datastore import get_chunks, save_chunks
+from .datastore import execute_insertmany, get_chunks, save_chunks
 from .edgar import SECFiling
 from .llm.embedding import GEMINI_EMBEDDING_MODEL, batch_embedding
 from .splitter import chunk_text, trim_html_content
@@ -114,14 +115,15 @@ def process_filing(
     embedding_table_name: str,
     search_phrase_table_name: str,
     form_type: str,
+    trustee_comp_result_tablen_name: str,
 ) -> dict[str, Any]:
     ret_val = {}
 
     key = f"Filing({cik},{accession_number})"
+    ret_val[key] = key
     log_n_print(
         f"Processing {key} for {actions} with search_tag={search_tag}, tags={tags}"
     )
-    ret_val[key] = key
 
     if "chunk" in actions:
         filing = SECFiling(cik=cik, accession_number=accession_number)
@@ -131,12 +133,11 @@ def process_filing(
             tags=tags,
             table_name=text_table_name,
         )
+        ret_val["n_chunks"] = n_chunks
         if n_chunks > 1:
             log_n_print(f"{key} {form_type} splitted into {n_chunks} chunks")
         else:
             log_n_print(f"Error when splitting {key} {form_type}")
-
-        ret_val["n_chunks"] = n_chunks
 
     if "embedding" in actions:
         n_embeddings = save_filing_embeddings(
@@ -147,12 +148,11 @@ def process_filing(
             embedding_table_name=embedding_table_name,
             dimension=dimension,
         )
+        ret_val["n_embeddings"] = n_embeddings
         if n_embeddings > 1:
             log_n_print(f"Saved {n_embeddings} embeddings for {key} {form_type}")
         else:
             log_n_print(f"Error when get embeddings for {key} {form_type}")
-
-        ret_val["n_embeddings"] = n_embeddings
 
     if "extract" in actions:
         response, comp_info = extract_trustee_comp(
@@ -165,12 +165,32 @@ def process_filing(
             search_phrase_tag=search_tag,
             model=model,
         )
-        logger.debug(f"{model} response:{response}")
+        # logger.debug(f"{model} response:{response}")
         n_trustees = len(comp_info["trustees"]) if comp_info else 0
         log_n_print(f"Extracted {n_trustees} from {key}")
 
         ret_val["response"] = response
         ret_val["comp_info"] = comp_info
+
+        result_saved = execute_insertmany(
+            table_name=trustee_comp_result_tablen_name,
+            data=[
+                {
+                    "cik": cik,
+                    "accession_number": accession_number,
+                    "model": model,
+                    "tags": tags,
+                    "response": response,
+                    "comp_info": json.dumps(comp_info),
+                    "n_trustees": n_trustees,
+                }
+            ],
+            create_table=True,
+        )
+
+        ret_val["result_saved"] = result_saved
+        if not result_saved:
+            log_n_print(f"Error when saving {key} trustee comp result")
 
     return ret_val
 

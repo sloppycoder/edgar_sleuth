@@ -42,9 +42,9 @@ def relevant_chunks_with_distances(
         WHERE
             cik = %s AND accession_number = %s
             AND %s = ANY(phrases.tags) AND %s = ANY(docs.tags)
-            ORDER BY
-                embedding <=> phrase_embedding
-            limit {limit};
+        ORDER BY
+            embedding <=> phrase_embedding
+        LIMIT {limit};
     """,
         (cik, accession_number, search_phrase_tag, embedding_tag),
     )
@@ -88,8 +88,7 @@ def save_chunks(
     dimension = len(chunks[0]) if isinstance(chunks[0], list) else 0
 
     if create_table:
-        statement = _gen_create_statement(table_name, dimension=dimension)
-        _conn().execute(statement)  # pyright: ignore
+        _create_table(table_name, dimension=dimension)
 
     try:
         _conn().execute(
@@ -124,28 +123,6 @@ def save_chunks(
     _conn().commit()
 
 
-def initialize_search_phrases_table(table_name: str, data, tags: list[str] = []) -> None:
-    dimension = len(data[0][1])
-    statement = _gen_create_statement(table_name, dimension=dimension)
-    _conn().execute(statement)  # pyright: ignore
-
-    phrases = [phrase for phrase, _ in data]
-    execute_query(
-        f"DELETE FROM {table_name} WHERE tags = %s",
-        (phrases, tags),
-    )
-
-    for phrase, embedding in data:
-        execute_query(
-            f"INSERT INTO {table_name} (phrase,phrase_embedding,tags) VALUES (%s,%s,%s)",
-            (phrase, embedding, tags),
-        )
-
-    logger.info(
-        f"Initialized {len(data)} search phrases in {table_name} with size {dimension}"
-    )
-
-
 def execute_query(query, params=None) -> list[dict[str, Any]]:
     result = []
     with _conn().cursor() as cur:
@@ -157,11 +134,12 @@ def execute_query(query, params=None) -> list[dict[str, Any]]:
                 cur.execute(query, params)
                 rows = cur.fetchall()
                 column_names = [desc[0] for desc in cur.description]  # pyright: ignore
-                result = [dict(zip(column_names, row)) for row in rows]
+                return [dict(zip(column_names, row)) for row in rows]
             else:
                 # it's not a select
                 cur.execute(query, params)
                 _conn().commit()
+                return []  # empty list means success
 
         except psycopg.errors.SyntaxError as e:
             logger.info(f"Syntax error: {str(e)} {query}")
@@ -172,9 +150,44 @@ def execute_query(query, params=None) -> list[dict[str, Any]]:
     return result
 
 
-def _gen_create_statement(table_name: str, dimension: int = 0) -> str:
+def execute_insertmany(
+    table_name: str, data: list[dict[str, Any]], create_table: bool
+) -> bool:
+    if len(data) == 0:
+        return False
+
+    dimension = 0
+    for _, value in data[0].items():
+        if isinstance(value, list):
+            if isinstance(value[0], float):
+                dimension = len(value)
+                break
+
+    if create_table:
+        _create_table(table_name, dimension)
+
+    columns = ", ".join(data[0].keys())
+    placeholders = ", ".join(["%s"] * len(data[0]))
+    bindings = [tuple(item.values()) for item in data]
+    query = f" INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+    try:
+        with _conn().cursor() as cur:
+            cur.executemany(query, bindings)  # pyright: ignore
+        _conn().commit()
+        logger.debug(f"Inserted {len(data)} rows into {table_name}")
+        return True
+    except psycopg.errors.SyntaxError as e:
+        logger.info(f"Syntax error: {str(e)} {query}")
+    except psycopg.Error as e:
+        logger.info(f"Database error: {e} when executing {query}")
+        _conn().rollback()
+
+    return False
+
+
+def _create_table(table_name: str, dimension: int = 0):
     if table_name.startswith("filing_text_chunks"):
-        return f"""
+        statement = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
             cik VARCHAR(10) NOT NULL,
             accession_number VARCHAR(20) NOT NULL,
@@ -183,7 +196,7 @@ def _gen_create_statement(table_name: str, dimension: int = 0) -> str:
             tags TEXT[])
         """
     elif table_name.startswith("filing_chunks_embeddings"):
-        return f"""
+        statement = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
             cik VARCHAR(10) NOT NULL,
             accession_number VARCHAR(20) NOT NULL,
@@ -192,11 +205,24 @@ def _gen_create_statement(table_name: str, dimension: int = 0) -> str:
             tags TEXT[])
         """
     elif table_name.startswith("search_phrase_embeddings"):
-        return f"""
+        statement = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
             phrase VARCHAR(255) PRIMARY KEY,
             phrase_embedding VECTOR({dimension}),
             tags TEXT[]
         )"""
+    elif table_name.startswith("trustee_comp_results"):
+        statement = f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            cik VARCHAR(10) NOT NULL,
+            accession_number VARCHAR(20) NOT NULL,
+            model VARCHAR(32) NOT NULL,
+            response TEXT NOT NULL,
+            comp_info JSONB,
+            n_trustees INTEGER,
+            tags TEXT[]
+        )"""
     else:
         raise ValueError(f"Do not know how to create table {table_name}")
+
+    return _conn().execute(statement)  # pyright: ignore

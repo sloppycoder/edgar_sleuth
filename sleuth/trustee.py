@@ -2,8 +2,9 @@ import logging
 from datetime import datetime
 
 from .datastore import (
+    execute_insertmany,
+    execute_query,
     get_chunks,
-    initialize_search_phrases_table,
     relevant_chunks_with_distances,
 )
 from .llm.algo import (
@@ -82,17 +83,68 @@ Please remove the leading $ sign and comma from compensation Amount.
 def create_search_phrase_embeddings(
     table_name: str, model: str, tag: str, dimension: int
 ) -> None:
+    table_name = "search_phrase_embeddings"
+
     embeddings = batch_embedding(
         chunks=TRUSTEE_COMP_SEARCH_PHRASES,
         model=model,
         task_type="RETRIEVAL_QUERY",
         dimension=dimension,
     )
-    data = list(zip(TRUSTEE_COMP_SEARCH_PHRASES, embeddings))
-    initialize_search_phrases_table(table_name=table_name, data=data, tags=[tag])
+    data = [
+        {"phrase": phrase, "phrase_embedding": embedding}
+        for phrase, embedding in zip(TRUSTEE_COMP_SEARCH_PHRASES, embeddings)
+    ]
+    for item in data:
+        item["tags"] = [tag]
+
+    execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([tag]))
+    execute_insertmany(table_name=table_name, data=data, create_table=True)
+    logger.info(
+        f"Initialized {len(data)} search phrases in {table_name} with size {dimension}"
+    )
 
 
-def find_relevant_text(
+def extract_trustee_comp(
+    cik: str,
+    accession_number: str,
+    search_phrase_table_name: str,
+    text_table_name: str,
+    embedding_table_name: str,
+    search_phrase_tag: str,
+    tag: str,
+    model: str,
+) -> tuple[str | None, dict | None]:
+    # the extractino process has 4 steps
+    # step 1: chunk the filing
+    # step 2: get embedding
+    # the above 2 steps are outside this function
+
+    # step 3: using search phrases to run vector search
+    # use scoring alborithm to determine the most relevant text chunks
+    relevant_text = _find_relevant_text(
+        cik=cik,
+        accession_number=accession_number,
+        text_table_name=text_table_name,
+        embedding_table_name=embedding_table_name,
+        search_phrase_table_name=search_phrase_table_name,
+        tag=tag,
+        search_phrase_tag=search_phrase_tag,
+    )
+    if not relevant_text or len(relevant_text) < 100:
+        logger.info(
+            f"No relevant text found for {cik},{accession_number} with tags {search_phrase_tag} and {tag}"  # noqa E501
+        )
+
+    # step 4: send the relevant text to the LLM model with designed prompt
+    response, comp_info = _ask_model_about_trustee_comp(model, relevant_text)
+    if response and comp_info:
+        return response, comp_info
+
+    return None, None
+
+
+def _find_relevant_text(
     cik: str,
     accession_number: str,
     text_table_name: str,
@@ -129,7 +181,7 @@ def find_relevant_text(
         return ""
 
 
-def ask_model_about_trustee_comp(model: str, relevant_text: str):
+def _ask_model_about_trustee_comp(model: str, relevant_text: str):
     start_t = datetime.now()
     prompt = TRUSTEE_COMP_PROMPT.replace("{SEC_FILING_SNIPPET}", relevant_text)
     response = ask_model(model, prompt)
@@ -141,43 +193,4 @@ def ask_model_about_trustee_comp(model: str, relevant_text: str):
     if response:
         comp_info = extract_json_from_response(response)
         return response, comp_info
-    return None, None
-
-
-def extract_trustee_comp(
-    cik: str,
-    accession_number: str,
-    search_phrase_table_name: str,
-    text_table_name: str,
-    embedding_table_name: str,
-    search_phrase_tag: str,
-    tag: str,
-    model: str,
-) -> tuple[str | None, dict | None]:
-    # the extractino process has 4 steps
-    # step 1: chunk the filing
-    # step 2: get embedding
-    # the above 2 steps are outside this function
-
-    # step 3: using search phrases to run vector search
-    # use scoring alborithm to determine the most relevant text chunks
-    relevant_text = find_relevant_text(
-        cik=cik,
-        accession_number=accession_number,
-        text_table_name=text_table_name,
-        embedding_table_name=embedding_table_name,
-        search_phrase_table_name=search_phrase_table_name,
-        tag=tag,
-        search_phrase_tag=search_phrase_tag,
-    )
-    if not relevant_text or len(relevant_text) < 100:
-        logger.info(
-            f"No relevant text found for {cik},{accession_number} with tags {search_phrase_tag} and {tag}"  # noqa E501
-        )
-
-    # step 4: send the relevant text to the LLM model with designed prompt
-    response, comp_info = ask_model_about_trustee_comp(model, relevant_text)
-    if response and comp_info:
-        return response, comp_info
-
     return None, None

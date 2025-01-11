@@ -156,6 +156,7 @@ def main(
     text_table_name = "filing_text_chunks"
     embedding_table_name = "filing_chunks_embeddings"
     search_phrase_table_name = "search_phrase_embeddings"
+    trustee_comp_result_tablen_name = "trustee_comp_results"
     form_type = "485BPOS"
 
     answer = "no"
@@ -166,6 +167,7 @@ def main(
                 text_table_name,
                 embedding_table_name,
                 search_phrase_table_name,
+                trustee_comp_result_tablen_name,
             ]:
                 print(f"Dropping table {table_name}")
                 execute_query(f"DROP TABLE IF EXISTS {table_name}")
@@ -205,6 +207,7 @@ def main(
                 embedding_table_name=embedding_table_name,
                 search_phrase_table_name=search_phrase_table_name,
                 form_type=form_type,
+                trustee_comp_result_tablen_name=trustee_comp_result_tablen_name,
             )
     else:
         all_filings = list(enumerate_filings(batch, batch_limit))
