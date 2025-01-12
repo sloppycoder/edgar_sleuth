@@ -76,7 +76,7 @@ def _chat_with_gpt(model_name: str, prompt: str) -> Optional[str]:
 
 @retry(
     stop=stop_after_attempt(5),
-    wait=wait_exponential(multiplier=1, min=1, max=10),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
     retry=retry_if_exception_type(ResourceExhausted),
 )
 def _chat_with_gemini(model_name: str, prompt: str) -> Optional[str]:
