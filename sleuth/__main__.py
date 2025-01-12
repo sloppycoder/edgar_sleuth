@@ -10,7 +10,7 @@ from typing import Iterator
 import click
 import yaml
 
-from .datastore import execute_query
+from .datastore import DatabaseException, execute_query
 from .edgar import SECFiling, parse_idx_filename
 from .llm.embedding import GEMINI_EMBEDDING_MODEL
 from .processor import init_worker, process_filing, process_filing_wrapper
@@ -169,7 +169,10 @@ def main(
                 trustee_comp_result_tablen_name,
             ]:
                 print(f"Dropping table {table_name}")
-                execute_query(f"DROP TABLE IF EXISTS {table_name}")
+                try:
+                    execute_query(f"DROP TABLE IF EXISTS {table_name}")
+                except DatabaseException:
+                    pass
 
     if action == "init" or (action == "initdb" and answer.lower() == "yes"):
         print("Initializing search phrase embeddings...")

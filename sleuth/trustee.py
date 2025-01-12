@@ -103,7 +103,7 @@ def create_search_phrase_embeddings(
         item["tags"] = [tag]
 
     try:
-        execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([tag]))
+        execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([tag],))
     except DatabaseException as e:
         if "does not exist" not in str(e):
             raise e
