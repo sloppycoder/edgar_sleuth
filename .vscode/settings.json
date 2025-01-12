@@ -28,6 +28,13 @@
             "driver": "PostgreSQL",
             "connectString": "postgresql://@/edgar2",
             "name": "edgar2"
+        },
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "driver": "PostgreSQL",
+            "connectString": "postgresql://@/edgar",
+            "name": "edgar"
         }
     ],
 }

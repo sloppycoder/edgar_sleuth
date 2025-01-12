@@ -29,6 +29,7 @@ cache/
 *.jsonl
 tmp/
 data/
+sql/
 
 # cloud credential
 edgar-*.json
