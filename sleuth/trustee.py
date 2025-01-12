@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from .datastore import (
+    DatabaseException,
     execute_insertmany,
     execute_query,
     get_chunks,
@@ -101,7 +102,12 @@ def create_search_phrase_embeddings(
     for item in data:
         item["tags"] = [tag]
 
-    execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([tag]))
+    try:
+        execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([tag]))
+    except DatabaseException as e:
+        if "does not exist" not in str(e):
+            raise e
+
     execute_insertmany(table_name=table_name, data=data, create_table=True)
     logger.info(
         f"Initialized {len(data)} search phrases in {table_name} with size {dimension}"
@@ -139,7 +145,7 @@ def extract_trustee_comp(
         # step 4: send the relevant text to the LLM model with designed prompt
         response, comp_info = _ask_model_about_trustee_comp(model, relevant_text)
         if response and comp_info:
-            n_trustees = len(comp_info["trustees"]) if comp_info else 0
+            n_trustee = len(comp_info["trustees"]) if comp_info else 0
             return {
                 "cik": cik,
                 "accession_number": accession_number,
@@ -147,7 +153,7 @@ def extract_trustee_comp(
                 "tags": [tag],
                 "response": response,
                 "comp_info": json.dumps(comp_info),
-                "n_trustees": n_trustees,
+                "n_trustee": n_trustee,
                 "selected_chunks": relevant_chunks,
                 "selected_text": relevant_text,
             }
