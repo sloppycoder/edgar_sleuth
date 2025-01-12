@@ -167,9 +167,9 @@ def process_filing(
 
         if extraction_result:
             # logger.debug(f"{model} response:{response}")
-            log_n_print(f"Extracted {extraction_result["n_trustees"]} from {key}")
+            log_n_print(f"Extracted {extraction_result["n_trustee"]} from {key}")
 
-            ret_val["n_trustees"] = extraction_result["n_trustees"]
+            ret_val["n_trustee"] = extraction_result["n_trustee"]
 
             result_saved = execute_insertmany(
                 table_name=trustee_comp_result_tablen_name,
