@@ -147,11 +147,11 @@ def execute_query(query, params=None) -> list[dict[str, Any]]:
 
         except psycopg.errors.SyntaxError as e:
             logger.info(f"Syntax error: {str(e)} {query}")
-            raise DatabaseException from e
+            raise DatabaseException(str(e)) from e
         except psycopg.Error as e:
             logger.info(f"Database error: {e} when executing {query}")
             _conn().rollback()
-            raise DatabaseException from e
+            raise DatabaseException(str(e)) from e
 
     return result
 
@@ -229,7 +229,7 @@ def _create_table(table_name: str, dimension: int = 0):
             selected_text TEXT NOT NULL,
             response TEXT NOT NULL,
             comp_info JSONB,
-            n_trustees INTEGER,
+            n_trustee INTEGER,
             tags TEXT[]
         )"""
     else:
