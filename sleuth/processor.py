@@ -116,6 +116,7 @@ def gather_extractin_result(
             form_type,
             TO_CHAR(date_filed, 'YYYY-MM-DD') as date_filed,
             idx_filename as filename,
+            accession_number,
             res.selected_chunks as chunks_used,
             res.selected_text as relevant_text,
             res.n_trustee as num_trustees,
