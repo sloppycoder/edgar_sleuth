@@ -14,13 +14,13 @@ python -m sleuth load-index --input="2024/*"
 psql <database> -f sql/sample.sql
 
 # chunk
-python -m sleuth chunk --input-tag=15pct --tags=15pct --workers=6
+python -m sleuth chunk --input-tag=10pct --tags=10pct --workers=6
 
 # embedding
-python -m sleuth embedding --input-tag=15pct --tags=15pct --workers=4
+python -m sleuth embedding --input-tag=10pct --tags=10pct --workers=4
 
 # embedding
-python -m sleuth init-search-phrases --tags=15pct
+python -m sleuth init-search-phrases --tags=10pct
 
 # extraction
-python -m sleuth extract --input-tag=15pct --tags=15pct --workers=3
+python -m sleuth extract --input-tag=10pct --tags=10pct --workers=3
