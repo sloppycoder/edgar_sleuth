@@ -177,16 +177,13 @@ def main(
     else:
         model = "gemini-1.5-flash-002" if model == "gemini" else "gpt-4o-mini"
 
-    if action not in ["init-search-phrases"] and not input_tag:
+    if action not in ["load-index", "init-search-phrases"] and not input_tag:
         raise click.UsageError("--input-tag is required")
 
     if action not in ["export"] and not tags:
         raise click.UsageError("output tags is required")
 
     if action == "load-index":
-        if not input_:
-            raise click.UsageError("--input is required when action is load-index")
-
         for year in range(1995, 2025):
             for quarter in range(1, 5):
                 if fnmatch(f"{year}/{quarter}", input_):

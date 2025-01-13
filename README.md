@@ -6,7 +6,7 @@ Using LLM to extract information from filings on SEC EDGAR website.
 ```shell
 
 # load index, thos step loads all records in master_idx
-python -m sleuth load-index --input="202*/*" --tags=orig225
+python -m sleuth load-index --input="202*/*"
 
 # manually select and tag records and save them to master_idx_sample
 psql -f sql/random_sample.sql
