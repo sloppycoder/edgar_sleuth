@@ -4,12 +4,12 @@ CREATE TABLE sampled_cik AS WITH distinct_cik AS (
     FROM master_idx
     WHERE date_filed BETWEEN '2023-01-01' AND '2024-12-31'
 ) -- Get all distinct `cik` values for the specified date range
----Randomly sample 15% of the distinct `cik` values
+---Randomly sample 10% of the distinct `cik` values
 SELECT cik
 FROM distinct_cik
 ORDER BY random()
 LIMIT (
-        SELECT CEIL(0.15 * COUNT(*))
+        SELECT CEIL(0.1 * COUNT(*))
         FROM distinct_cik
     );
 -- Step 3: Insert deduped records into the new table
@@ -17,10 +17,11 @@ DROP TABLE IF EXISTS master_idx_sample;
 CREATE TABLE master_idx_sample AS
 SELECT DISTINCT *
 FROM master_idx
-WHERE cik IN (
+WHERE date_filed BETWEEN '2023-01-01' AND '2024-12-31'
+    AND cik IN (
         SELECT cik
         FROM sampled_cik
     );
 -- Step4: Tag the records for later processing
 UPDATE master_idx_sample
-SET tags = ARRAY ['15pct']
+SET tags = ARRAY ['10pct']

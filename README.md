@@ -9,9 +9,9 @@ Using LLM to extract information from filings on SEC EDGAR website.
 python -m sleuth load-index --input="2024/*"
 
 # manually select and tag records and save them to master_idx_sample
-# currently it samples 15% of all companies filed between 2023-2024
-# and tag them "15pct"
-psql -f sql/sample.sql
+# currently it samples 10% of all companies filed between 2023-2024
+# and tag them "10pct"
+psql <database> -f sql/sample.sql
 
 # chunk
 python -m sleuth chunk --input-tag=15pct --tags=15pct --workers=6
