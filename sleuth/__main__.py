@@ -170,14 +170,14 @@ def main(
         input_ = input_ or "filing_chunks_embeddings"
         output = output or "trustee_comp_results"
     elif action == "load-index":
-        output = output or "master_idx_sample"
+        output = output or "master_idx"
 
     if action != "extract":
         model = GEMINI_EMBEDDING_MODEL if model == "gemini" else OPENAI_EMBEDDING_MODEL
     else:
         model = "gemini-1.5-flash-002" if model == "gemini" else "gpt-4o-mini"
 
-    if action not in ["load-index", "init-search-phrases"] and not input_tag:
+    if action not in ["init-search-phrases"] and not input_tag:
         raise click.UsageError("--input-tag is required")
 
     if action not in ["export"] and not tags:
@@ -187,7 +187,7 @@ def main(
         if not input_:
             raise click.UsageError("--input is required when action is load-index")
 
-        for year in range(1999, 2025):
+        for year in range(1995, 2025):
             for quarter in range(1, 5):
                 if fnmatch(f"{year}/{quarter}", input_):
                     n_count = save_master_idx(year, quarter, "485BPOS", tags=tags)

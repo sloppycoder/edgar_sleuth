@@ -5,8 +5,11 @@ Using LLM to extract information from filings on SEC EDGAR website.
 
 ```shell
 
-# load index
+# load index, thos step loads all records in master_idx
 python -m sleuth load-index --input="202*/*" --tags=orig225
+
+# manually select and tag records and save them to master_idx_sample
+psql -f sql/random_sample.sql
 
 # chunk
 python -m sleuth chunk --input-tag=orig225 --tags=orig225 --workers=6
