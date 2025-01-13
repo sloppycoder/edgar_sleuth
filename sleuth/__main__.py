@@ -1,3 +1,4 @@
+import json
 import logging
 import logging.config
 import multiprocessing
@@ -13,7 +14,12 @@ import yaml
 from .datastore import execute_insertmany, execute_query
 from .edgar import read_master_idx
 from .llm.embedding import GEMINI_EMBEDDING_MODEL, OPENAI_EMBEDDING_MODEL
-from .processor import init_worker, process_filing, process_filing_wrapper
+from .processor import (
+    gather_extractin_result,
+    init_worker,
+    process_filing,
+    process_filing_wrapper,
+)
 from .trustee import create_search_phrase_embeddings
 
 MAX_ERRORS = 5
@@ -202,7 +208,17 @@ def main(
         return
 
     if action == "export":
-        print("Not yet implemented...")
+        result = gather_extractin_result(
+            idx_table_name="master_idx_sample",
+            extraction_result_table_name="trustee_comp_results",
+            tag=input_tag,
+        )
+        with open(output, "w") as f:
+            for row in result:
+                jsonl = json.dumps(row)
+                f.write(jsonl)
+                f.write("\n")
+        print(f"Exported {len(result)} records to {output}")
         return
 
     print(f"Running {action} with tags {tags} and output to {output}")

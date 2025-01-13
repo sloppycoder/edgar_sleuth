@@ -14,5 +14,8 @@ python -m sleuth chunk --input-tag=orig225 --tags=orig225 --workers=6
 # embedding
 python -m sleuth embedding --input-tag=orig225 --tags=orig225 --workers=4
 
+# embedding
+python -m sleuth init-search-phrases --tags=orig225
+
 # extraction
 python -m sleuth extract --input-tag=orig225 --tags=orig225 --workers=3

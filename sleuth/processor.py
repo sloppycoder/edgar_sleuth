@@ -1,12 +1,14 @@
+import json
 import logging
 from datetime import datetime
 from logging.handlers import QueueHandler
+from typing import Any
 
-from .datastore import execute_insertmany, get_chunks, save_chunks
+from .datastore import execute_insertmany, execute_query, get_chunks, save_chunks
 from .edgar import SECFiling
 from .llm.embedding import GEMINI_EMBEDDING_MODEL, batch_embedding
 from .splitter import chunk_text, trim_html_content
-from .trustee import extract_trustee_comp
+from .trustee import extract_json_from_response, extract_trustee_comp
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +104,44 @@ def chunk_filing(
     return 0, []
 
 
+def gather_extractin_result(
+    idx_table_name: str,
+    extraction_result_table_name: str,
+    tag: str,
+) -> list[dict[str, Any]]:
+    query = f"""
+        SELECT DISTINCT
+            idx.cik,
+            company_name,
+            form_type,
+            TO_CHAR(date_filed, 'YYYY-MM-DD') as date_filed,
+            idx_filename as filename,
+            res.selected_chunks as chunks_used,
+            res.selected_text as relevant_text,
+            res.n_trustee as num_trustees,
+            res.response as trustees_comp
+        FROM {idx_table_name} idx
+        LEFT JOIN {extraction_result_table_name} res
+            ON res.cik = idx.cik
+            AND res.accession_number = idx.accession_number
+            AND %s = ANY(res.tags)
+        WHERE %s = ANY(idx.tags)
+        LIMIT 10000
+    """
+
+    rows = execute_query(query, (tag, tag))
+    for row in rows:
+        if (
+            "trustees_comp" in row
+            and row["trustees_comp"]
+            and row["trustees_comp"].startswith("```json")
+        ):
+            row["trustees_comp"] = json.dumps(
+                extract_json_from_response(row["trustees_comp"])
+            )
+    return rows
+
+
 def process_filing(
     action: str,
     dimension: int,
@@ -177,9 +217,12 @@ def process_filing(
 
             if result_saved:
                 return True
-            else:
-                log_n_print(f"Error when saving {key} trustee comp result")
-                return False
+
+        log_n_print(f"Error when saving {key} trustee comp result")
+        return False
+    else:
+        log_n_print(f"Unknown action {action}")
+        return False
 
 
 def process_filing_wrapper(args: dict):

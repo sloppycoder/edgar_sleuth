@@ -12,10 +12,9 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "extract",
+                "export",
+                "--output=tmp/1.jsonl",
                 "--input-tag=orig225",
-                "--tags=orig225",
-                "--batch-limit=2"
             ]
         },
         {
