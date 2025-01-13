@@ -36,6 +36,7 @@ def save_master_idx(
     year: int,
     quarter: int,
     form_type_filter: str,
+    output_table_name: str,
     tags: list[str] = [],
 ) -> int:
     rows = read_master_idx(year, quarter, form_type_filter)
@@ -46,7 +47,7 @@ def save_master_idx(
     for row in rows:
         row["tags"] = tags
 
-    if execute_insertmany("master_idx_sample", rows, create_table=True):
+    if execute_insertmany(output_table_name, rows, create_table=True):
         return len(rows)
     else:
         logger.error(f"Failed to save master idx for {year} Q{quarter}")
@@ -153,6 +154,7 @@ def main(
 ) -> None:
     # checking and setting default for parameters
     tags = output_tags_str.split(",") if output_tags_str else []
+    form_type = "485BPOS"
 
     if action == "chunk":
         input_ = input_ or "master_idx_sample"
@@ -187,7 +189,13 @@ def main(
         for year in range(1995, 2025):
             for quarter in range(1, 5):
                 if fnmatch(f"{year}/{quarter}", input_):
-                    n_count = save_master_idx(year, quarter, "485BPOS", tags=tags)
+                    n_count = save_master_idx(
+                        output_table_name=output,
+                        year=year,
+                        quarter=quarter,
+                        form_type_filter=form_type,
+                        tags=tags,
+                    )
                     if n_count:
                         print(f"Saved {n_count} records for {year}-QTR{quarter}")
                     else:
@@ -205,6 +213,7 @@ def main(
         return
 
     if action == "export":
+        # TODO: remove hard coded table names
         result = gather_extractin_result(
             idx_table_name="master_idx_sample",
             extraction_result_table_name="trustee_comp_results",
@@ -220,47 +229,33 @@ def main(
 
     print(f"Running {action} with tags {tags} and output to {output}")
 
-    form_type = "485BPOS"
     # TODO: remove hard coded table names
     text_table_name = "filing_text_chunks"
     search_phrase_table_name = "search_phrase_embeddings"
 
-    if workers == 1:
-        for cik, accession_number in enumerate_filings(input_tag, batch_limit):
-            process_filing(
-                action=action,
-                dimension=dimension,
-                cik=cik,
-                accession_number=accession_number,
-                input_tag=input_tag,
-                output_tags=tags,
-                model=model,
-                input_table=input_,
-                output_table=output,
-                form_type=form_type,
-                search_phrase_table_name=search_phrase_table_name,
-                text_table_name=text_table_name,
-            )
-    else:
-        all_filings = list(enumerate_filings(input_tag, batch_limit))
-        args = [
-            {
-                "action": action,
-                "dimension": dimension,
-                "cik": cik,
-                "accession_number": accession_number,
-                "input_table": input_,
-                "input_tag": input_tag,
-                "output_tags": tags,
-                "model": model,
-                "output_table": output,
-                "form_type": form_type,
-                "search_phrase_table_name": search_phrase_table_name,
-                "text_table_name": text_table_name,
-            }
-            for cik, accession_number in all_filings
-        ]
+    # list of arguments to pass to process_filing
+    args = [
+        {
+            "action": action,
+            "dimension": dimension,
+            "cik": cik,
+            "accession_number": accession_number,
+            "input_table": input_,
+            "input_tag": input_tag,
+            "output_tags": tags,
+            "model": model,
+            "output_table": output,
+            "form_type": form_type,
+            "search_phrase_table_name": search_phrase_table_name,
+            "text_table_name": text_table_name,
+        }
+        for cik, accession_number in list(enumerate_filings(input_tag, batch_limit))
+    ]
 
+    if workers == 1:
+        for arg in args:
+            process_filing(**arg)
+    else:
         # create a queue to receive log messages from worker processes
         # https://stackoverflow.com/questions/641420/how-should-i-log-while-using-multiprocessing-in-python
         logging_q = multiprocessing.Queue()

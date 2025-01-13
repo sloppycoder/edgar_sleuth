@@ -91,4 +91,13 @@ def test_sleuth_cli():
 
 
 def test_save_master_idx(clean_db):
-    assert save_master_idx(2020, 1, form_type_filter="485BPOS", tags=["pytest"]) == 1824
+    assert (
+        save_master_idx(
+            output_table_name="master_idx",
+            year=2020,
+            quarter=1,
+            form_type_filter="485BPOS",
+            tags=["pytest"],
+        )
+        == 1824
+    )
