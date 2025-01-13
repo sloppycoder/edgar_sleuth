@@ -55,7 +55,7 @@ def test_get_n_save_chunks(clean_db):
 
 
 def test_save_embedding_chunks(clean_db):
-    dimension = 256
+    dimension = 768
     embedding_chunks = [
         _rand_vec(dimension),
         _rand_vec(dimension),
@@ -85,7 +85,7 @@ def test_execute_insertmany(clean_db):
 
 
 def test_relevant_chunks_with_distances(clean_db):
-    # TODO: implement this
+    # TODO: implement this, need data in test db to work
     pass
 
 

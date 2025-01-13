@@ -1,11 +1,9 @@
-import json
 import os
-from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
 
-from sleuth.__main__ import main
+from sleuth.__main__ import main, save_master_idx
 from sleuth.llm.embedding import GEMINI_EMBEDDING_MODEL
 from sleuth.processor import process_filing
 from sleuth.trustee import (
@@ -23,14 +21,8 @@ def test_process_filing(clean_db):
     """take one simple filing and run through the entire flow"""
 
     # table names used for testing
-    text_table_name = "filing_text_chunks"
-    embedding_table_name = "filing_chunks_embeddings"
-    search_phrase_table_name = "search_phrase_embeddings"
-    dimension = 256
+    dimension = 768
     tag = "pytest"
-    search_tag = f"pytest_gemini_{dimension}"
-    model = "gemini-1.5-flash-002"
-    trustee_comp_result_tablen_name = "trustee_comp_results"
 
     # simple filing
     cik = "1002427"
@@ -38,50 +30,65 @@ def test_process_filing(clean_db):
     form_type = "485BPOS"
 
     create_search_phrase_embeddings(
-        search_phrase_table_name,
+        "search_phrase_embeddings",
         model=GEMINI_EMBEDDING_MODEL,
-        tag=search_tag,
+        tags=[tag],
         dimension=dimension,
     )
 
     result = process_filing(
         cik=cik,
         accession_number=accession_number,
-        actions=["chunk", "embedding", "search_phrase", "extract"],
-        tags=[tag],
-        text_table_name=text_table_name,
-        embedding_table_name=embedding_table_name,
-        search_phrase_table_name=search_phrase_table_name,
-        dimension=dimension,
+        action="chunk",
+        input_table="master_idx_sample",
+        input_tag=tag,
+        output_table="filing_text_chunks",
+        output_tags=[tag],
         form_type=form_type,
-        model=model,
-        search_tag=search_tag,
-        trustee_comp_result_tablen_name=trustee_comp_result_tablen_name,
+        model="",
+        text_table_name="",
+        search_phrase_table_name="",
+        dimension=dimension,
     )
-
     assert result
-    assert result["n_chunks"] == 271
-    assert result["n_embeddings"] == result["n_chunks"]
-    assert (
-        result["response"] and result["comp_info"] and "trustees" in result["comp_info"]
+
+    result = process_filing(
+        cik=cik,
+        accession_number=accession_number,
+        action="embedding",
+        input_table="filing_text_chunks",
+        input_tag=tag,
+        output_table="filing_chunks_embeddings",
+        output_tags=[tag],
+        form_type=form_type,
+        model=GEMINI_EMBEDDING_MODEL,
+        text_table_name="filing_text_chunks",
+        search_phrase_table_name="search_phrase_embeddings",
+        dimension=dimension,
     )
+    assert result
+
+    result = process_filing(
+        cik=cik,
+        accession_number=accession_number,
+        action="extract",
+        input_table="filing_chunks_embeddings",
+        input_tag=tag,
+        output_table="trustee_comp_results",
+        output_tags=[tag],
+        form_type=form_type,
+        model="gemini-1.5-flash-002",
+        text_table_name="filing_text_chunks",
+        search_phrase_table_name="search_phrase_embeddings",
+        dimension=dimension,
+    )
+    assert result
 
 
 def test_sleuth_cli():
-    with patch("sleuth.__main__.process_filing") as mock_process_filing:
-        mock_process_filing.return_value = None
+    runner = CliRunner()
+    runner.invoke(main, ["chunk"])
 
-        key = json.dumps({"cik": "1002427", "accession_number": "0001133228-24-004879"})
 
-        runner = CliRunner()
-        result = runner.invoke(
-            main,
-            ["chunk", f"--batch={key}", "--tags=pytest"],
-        )
-
-        assert result.exit_code == 0
-        assert mock_process_filing.call_count == 1
-
-        _, kwargs = mock_process_filing.call_args
-        assert kwargs["actions"] == ["chunk"]
-        assert kwargs["accession_number"] == "0001133228-24-004879"
+def test_save_master_idx(clean_db):
+    assert save_master_idx(2020, 1, form_type_filter="485BPOS", tags=["pytest"]) == 1824

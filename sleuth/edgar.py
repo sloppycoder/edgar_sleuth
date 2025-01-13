@@ -172,6 +172,41 @@ def parse_idx_filename(idx_filename: str) -> tuple[str, str]:
     raise ValueError(f"parse_idx_filename: {idx_filename} is of an unexpected format")
 
 
+def read_master_idx(
+    year: int, quarter: int, form_type_filter: str = ""
+) -> list[dict[str, Any]]:
+    """
+    Read the master.idx file for a given year and quarter.
+    Returns a list of dictionaries containing contents of each entry
+    """
+    import csv
+
+    idx_filename = f"edgar/full-index/{year}/QTR{quarter}/master.idx"
+    content = edgar_file(idx_filename)
+    if not content:
+        raise RuntimeError(f"Unable to read {idx_filename}")
+
+    # sometimes index file contains illegal characters, replace them
+    lines = content.split("\n")
+    lines = [line.encode("utf-8", errors="replace").decode("utf-8") for line in lines]
+
+    # skip the first 10 lines of header
+    lines = lines[11:]
+    lines.insert(0, "cik|company_name|form_type|date_filed|idx_filename")
+
+    filings = []
+    reader = csv.DictReader(lines, delimiter="|")
+    for row in reader:
+        if row["form_type"] and (
+            not form_type_filter or row["form_type"].upper() == form_type_filter.upper()
+        ):
+            row["accession_number"] = (
+                row["idx_filename"].replace(".txt", "").split("/")[-1]
+            )
+            filings.append(row)
+    return filings
+
+
 def edgar_file(idx_filename: str, cached_only: bool = False) -> str | None:
     """
     e.g. edgar/data/123456/0001234567-21-000123.txt

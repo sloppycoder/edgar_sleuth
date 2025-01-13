@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime
 from logging.handlers import QueueHandler
-from typing import Any
 
 from .datastore import execute_insertmany, get_chunks, save_chunks
 from .edgar import SECFiling
@@ -22,7 +21,8 @@ def save_filing_embeddings(
     cik: str,
     accession_number: str,
     dimension: int,
-    tag: str,
+    input_tag: str,
+    tags: list[str],
     embedding_table_name: str,
     model: str = GEMINI_EMBEDDING_MODEL,
 ) -> int:
@@ -30,7 +30,7 @@ def save_filing_embeddings(
         cik=cik,
         accession_number=accession_number,
         table_name=text_table_name,
-        tag=tag,
+        tag=input_tag,
     )
     logger.debug(
         f"Retrieved {len(text_chunks_records)} text chunks for {cik} {accession_number}"
@@ -52,7 +52,7 @@ def save_filing_embeddings(
                 accession_number=accession_number,
                 chunks=embeddings,
                 table_name=embedding_table_name,
-                tags=[tag],
+                tags=tags,
                 create_table=True,
             )
         return len(embeddings)
@@ -103,65 +103,65 @@ def chunk_filing(
 
 
 def process_filing(
-    actions: list[str],
-    search_tag: str,
+    action: str,
     dimension: int,
     cik: str,
     accession_number: str,
-    tags: list[str],
+    input_table: str,
+    input_tag: str,
+    output_tags: list[str],
     model: str,
-    text_table_name: str,
-    embedding_table_name: str,
-    search_phrase_table_name: str,
+    output_table: str,
     form_type: str,
-    trustee_comp_result_tablen_name: str,
-) -> dict[str, Any]:
-    ret_val = {}
-
+    text_table_name: str,
+    search_phrase_table_name: str,
+) -> bool:
     key = f"Filing({cik},{accession_number})"
-    ret_val[key] = key
     log_n_print(
-        f"Processing {key} for {actions} with search_tag={search_tag}, tags={tags}"
+        f"Processing {key} for {action} with input_tag={input_tag}, output_tags={output_tags}"  # noqa: E501
     )
 
-    if "chunk" in actions:
+    if action == "chunk":
         filing = SECFiling(cik=cik, accession_number=accession_number)
         n_chunks, _ = chunk_filing(
             filing=filing,
             form_type=form_type,
-            tags=tags,
-            table_name=text_table_name,
+            tags=output_tags,
+            table_name=output_table,
         )
-        ret_val["n_chunks"] = n_chunks
         if n_chunks > 1:
             log_n_print(f"{key} {form_type} splitted into {n_chunks} chunks")
+            return True
         else:
             log_n_print(f"Error when splitting {key} {form_type}")
+            return False
 
-    if "embedding" in actions:
+    elif action == "embedding":
         n_embeddings = save_filing_embeddings(
-            text_table_name=text_table_name,
+            text_table_name=input_table,
             cik=cik,
             accession_number=accession_number,
-            tag=tags[0],
-            embedding_table_name=embedding_table_name,
+            input_tag=input_tag,
+            tags=output_tags,
+            embedding_table_name=output_table,
             dimension=dimension,
         )
-        ret_val["n_embeddings"] = n_embeddings
         if n_embeddings > 1:
             log_n_print(f"Saved {n_embeddings} embeddings for {key} {form_type}")
+            return True
         else:
             log_n_print(f"Error when get embeddings for {key} {form_type}")
+            return False
 
-    if "extract" in actions:
+    if action == "extract":
         extraction_result = extract_trustee_comp(
             cik=cik,
             accession_number=accession_number,
             text_table_name=text_table_name,
-            embedding_table_name=embedding_table_name,
+            embedding_table_name=input_table,
             search_phrase_table_name=search_phrase_table_name,
-            tag=tags[0],
-            search_phrase_tag=search_tag,
+            tag=input_tag,
+            search_phrase_tag=input_tag,
             model=model,
         )
 
@@ -169,20 +169,17 @@ def process_filing(
             # logger.debug(f"{model} response:{response}")
             log_n_print(f"Extracted {extraction_result["n_trustee"]} from {key}")
 
-            ret_val["n_trustee"] = extraction_result["n_trustee"]
-
             result_saved = execute_insertmany(
-                table_name=trustee_comp_result_tablen_name,
+                table_name=output_table,
                 data=[extraction_result],
                 create_table=True,
             )
 
-            ret_val["result_saved"] = result_saved
-
-            if not result_saved:
+            if result_saved:
+                return True
+            else:
                 log_n_print(f"Error when saving {key} trustee comp result")
-
-    return ret_val
+                return False
 
 
 def process_filing_wrapper(args: dict):

@@ -13,9 +13,9 @@
             "justMyCode": false,
             "args": [
                 "extract",
-                "--batch=@test1.jsonl",
-                "--search-tag=gemini768",
-                "--tags=orig225"
+                "--input-tag=orig225",
+                "--tags=orig225",
+                "--batch-limit=2"
             ]
         },
         {

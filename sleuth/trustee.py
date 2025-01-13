@@ -85,7 +85,7 @@ Please remove the leading $ sign and comma from compensation Amount.
 
 
 def create_search_phrase_embeddings(
-    table_name: str, model: str, tag: str, dimension: int
+    table_name: str, model: str, tags: list[str], dimension: int
 ) -> None:
     table_name = "search_phrase_embeddings"
 
@@ -100,10 +100,10 @@ def create_search_phrase_embeddings(
         for phrase, embedding in zip(TRUSTEE_COMP_SEARCH_PHRASES, embeddings)
     ]
     for item in data:
-        item["tags"] = [tag]
+        item["tags"] = tags
 
     try:
-        execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([tag],))
+        execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([tags],))
     except DatabaseException as e:
         if "does not exist" not in str(e):
             raise e

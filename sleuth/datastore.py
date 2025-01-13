@@ -1,15 +1,14 @@
 import logging
+import os
 import re
 from functools import lru_cache
 from typing import Any
 
 import psycopg
 
-import config
-
 logger = logging.getLogger(__name__)
 
-_sql_select_regex = re.compile(r"\bSELECT\b.*?\bFROM\b", re.DOTALL | re.IGNORECASE)
+_sql_select_regex = re.compile(r"\bSELECT\b.*?\b", re.DOTALL | re.IGNORECASE)
 
 
 class DatabaseException(Exception):
@@ -19,7 +18,10 @@ class DatabaseException(Exception):
 # use lru_cache to make a singleton
 @lru_cache(maxsize=1)
 def _conn() -> psycopg.Connection:
-    return psycopg.connect(config.database_url)
+    database_url = os.environ.get("DATABASE_URL", "")
+    if database_url:
+        return psycopg.connect(database_url)
+    raise ValueError("Use datastore.init(db_url) to initialize the connection")
 
 
 def relevant_chunks_with_distances(
@@ -35,8 +37,7 @@ def relevant_chunks_with_distances(
     Perform a vector search and return the most relevent chunks numbers
     along with their distance
     """
-    result = execute_query(
-        f"""
+    query = f"""
         SELECT
             cik, accession_number, phrase, chunk_num,
             embedding <=> phrase_embedding as distance
@@ -49,7 +50,9 @@ def relevant_chunks_with_distances(
         ORDER BY
             embedding <=> phrase_embedding
         LIMIT {limit};
-    """,
+    """
+    result = execute_query(
+        query,
         (cik, accession_number, search_phrase_tag, embedding_tag),
     )
     return result
@@ -127,7 +130,7 @@ def save_chunks(
     _conn().commit()
 
 
-def execute_query(query, params=None) -> list[dict[str, Any]]:
+def execute_query(query: str, params: tuple | None = None) -> list[dict[str, Any]]:
     result = []
     with _conn().cursor() as cur:
         logger.debug(f"Executing query: {query}\nwith parameters: {params}")
@@ -135,13 +138,13 @@ def execute_query(query, params=None) -> list[dict[str, Any]]:
         try:
             if _sql_select_regex.search(query):
                 # it's a select
-                cur.execute(query, params)
+                cur.execute(query, params)  # pyright: ignore
                 rows = cur.fetchall()
                 column_names = [desc[0] for desc in cur.description]  # pyright: ignore
                 return [dict(zip(column_names, row)) for row in rows]
             else:
                 # it's not a select
-                cur.execute(query, params)
+                cur.execute(query, params)  # pyright: ignore
                 _conn().commit()
                 return []  # empty list means success
 
@@ -149,7 +152,10 @@ def execute_query(query, params=None) -> list[dict[str, Any]]:
             logger.info(f"Syntax error: {str(e)} {query}")
             raise DatabaseException(str(e)) from e
         except psycopg.Error as e:
-            logger.info(f"Database error: {e} when executing {query}")
+            if not isinstance(e, psycopg.errors.UndefinedTable):
+                logger.info(f"Table does not exist: {str(e)}")
+            else:
+                logger.info(f"Database error: {e} when executing {query}")
             _conn().rollback()
             raise DatabaseException(str(e)) from e
 
@@ -165,7 +171,7 @@ def execute_insertmany(
     dimension = 0
     for _, value in data[0].items():
         if isinstance(value, list):
-            if isinstance(value[0], float):
+            if len(value) > 0 and isinstance(value[0], float):
                 dimension = len(value)
                 break
 
@@ -230,6 +236,17 @@ def _create_table(table_name: str, dimension: int = 0):
             response TEXT NOT NULL,
             comp_info JSONB,
             n_trustee INTEGER,
+            tags TEXT[]
+        )"""
+    elif table_name.startswith("master_idx"):
+        statement = f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            cik VARCHAR(10) NOT NULL,
+            company_name VARCHAR(255) NOT NULL,
+            form_type VARCHAR(16) NOT NULL,
+            date_filed DATE NOT NULL,
+            idx_filename VARCHAR(255) NOT NULL,
+            accession_number VARCHAR(20) NOT NULL,
             tags TEXT[]
         )"""
     else:

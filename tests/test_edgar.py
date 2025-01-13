@@ -5,6 +5,7 @@ from sleuth.edgar import (
     _index_html_path,
     edgar_file,
     parse_idx_filename,
+    read_master_idx,
 )
 
 
@@ -42,3 +43,8 @@ def test_parse_485bpos_filing():
     assert len(filing.documents) == 26
     assert html_path.endswith("msif-html7854_485bpos.htm")
     assert html_content and "N-1A" in html_content
+
+
+def test_read_master_idx():
+    entries = read_master_idx(2020, 1, form_type_filter="485BPOS")
+    assert len(entries) == 1824
