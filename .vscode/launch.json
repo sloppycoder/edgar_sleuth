@@ -12,8 +12,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "export",
-                "--output=tmp/1.jsonl",
+                "embedding",
                 "--input-tag=orig225",
             ]
         },
