@@ -14,13 +14,45 @@ python -m sleuth load-index --input="2024/*"
 psql <database> -f sql/sample.sql
 
 # chunk
-python -m sleuth chunk --input-tag=10pct --tags=10pct --workers=6
+python -m sleuth chunk --tag=10pct  --workers=6  \
+  --table idx=master_idx_sample \
+  --table text=filing_text_chunks
 
 # embedding
-python -m sleuth embedding --input-tag=10pct --tags=10pct --workers=4
+python -m sleuth embedding --tag=10pct --workers=4 \
+  --model gemini --dimension 768\
+  --table text=filing_text_chunks \
+  --table embedding=filing_chunks_embeddings
+
 
 # embedding
-python -m sleuth init-search-phrases --tags=10pct
+python -m sleuth init-search-phrases --tag=10pct \
+  --model gemini --dimension 768\
+  --table search=search_phrase_embeddings
+
 
 # extraction
-python -m sleuth extract --input-tag=10pct --tags=10pct --workers=3
+python -m sleuth extract --tag=10pct --result-tag=batch890 --workers=3 \
+  --table idx=master_idx_sample \
+  --table text=filing_text_chunks \
+  --table embedding=filing_chunks_embeddings \
+  --table search=search_phrase_embeddings \
+  --table result=trustee_comp_result \
+  --model gemini-1.5-flash-002
+
+python -m sleuth export --tag=10pct --result-tag=batch890 \
+  --table idx=master_idx_sample \
+  --table text=filing_text_chunks \
+  --table embedding=filing_chunks_embeddings \
+  --table result=trustee_comp_result
+
+action
+table, multiple
+tag
+result-tag
+worker
+dimension
+model
+
+tag required except load-index
+result-tag required for extract and export

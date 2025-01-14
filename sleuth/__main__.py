@@ -37,15 +37,11 @@ def save_master_idx(
     quarter: int,
     form_type_filter: str,
     output_table_name: str,
-    tags: list[str] = [],
 ) -> int:
     rows = read_master_idx(year, quarter, form_type_filter)
     if len(rows) == 0:
         logger.error(f"No records found for {year} Q{quarter} {form_type_filter}")
         return 0
-
-    for row in rows:
-        row["tags"] = tags
 
     if execute_insertmany(output_table_name, rows, create_table=True):
         return len(rows)
@@ -91,6 +87,16 @@ def enumerate_filings(
     ),
 )
 @click.option(
+    "--mask",
+    required=False,
+    help="Range of indexes to load, can use wildcards, e.g. 2020/*",
+)
+@click.option(
+    "--output",
+    required=False,
+    help="Output file for export action",
+)
+@click.option(
     "--batch-limit",
     type=int,
     default=0,
@@ -103,30 +109,16 @@ def enumerate_filings(
     help="Model to use for processing",
 )
 @click.option(
-    "-i",
-    "--input",
-    "input_",
+    "--table",
+    "tables",
     required=False,
-    help="Name of the table or file get read input from",
+    multiple=True,
+    help="Specify table names for overriding default ones. e.g. idx=master_idx_new",
 )
 @click.option(
-    "--input-tag",
-    "input_tag",
+    "--tag",
     required=False,
     help="tags used to query input",
-)
-@click.option(
-    "-o",
-    "--output",
-    "output",
-    required=False,
-    help="Name of the table or file to write processing output to",
-)
-@click.option(
-    "--tags",
-    "output_tags_str",
-    required=False,
-    help="tags associated with output",
 )
 @click.option(
     "--dimension",
@@ -143,58 +135,55 @@ def enumerate_filings(
 # ruff: noqa: C901
 def main(
     action: str,
+    tag: str,
+    result_tag: str,
+    tables: list[str],
     model: str,
-    batch_limit: int,
-    input_: str,
-    input_tag: str,
-    output: str,
-    output_tags_str: str,
     dimension: int,
+    batch_limit: int,
     workers: int,
+    mask: str,
+    output: str,
 ) -> None:
     # checking and setting default for parameters
-    tags = output_tags_str.split(",") if output_tags_str else []
     form_type = "485BPOS"
 
-    if action == "chunk":
-        input_ = input_ or "master_idx_sample"
-        output = output or "filing_text_chunks"
-    elif action == "embedding":
-        input_ = input_ or "filing_text_chunks"
-        output = output or "filing_chunks_embeddings"
-        # always carry the tag on text chunks to embedding
-        # this helps to correllate the embeddings back to the original text
-        if input_tag and input_tag not in tags:
-            tags += [input_tag]
-    elif action == "init-search-phrases":
-        output = output or "search_phrase_embeddings"
-    elif action == "extract":
-        input_ = input_ or "filing_chunks_embeddings"
-        output = output or "trustee_comp_results"
-    elif action == "load-index":
-        output = output or "master_idx"
+    # default table names
+    tables_map = {
+        "full-idx": "master_idx",
+        "idx": "master_idx_sample",
+        "chunks": "filing_text_chunks",
+        "embedding": "filing_chunks_embeddings",
+        "result": "trustee_comp_results",
+        "search": "search_phrase_embeddings",
+    }
+
+    # use command line options to override table names
+    for table in tables:
+        key, value = table.split("=")
+        if key in tables_map:
+            tables_map[key] = value
 
     if action != "extract":
         model = GEMINI_EMBEDDING_MODEL if model == "gemini" else OPENAI_EMBEDDING_MODEL
     else:
         model = "gemini-1.5-flash-002" if model == "gemini" else "gpt-4o-mini"
 
-    if action not in ["load-index", "init-search-phrases"] and not input_tag:
-        raise click.UsageError("--input-tag is required")
+    if action not in ["load-index"] and not tag:
+        raise click.UsageError(f"--tag is required for {action}")
 
-    if action not in ["load-index", "export"] and not tags:
-        raise click.UsageError("output tags is required")
+    if action in ["extract", "export"] and not result_tag:
+        raise click.UsageError(f"--result-tag is required for {action}")
 
     if action == "load-index":
         for year in range(1995, 2025):
             for quarter in range(1, 5):
-                if fnmatch(f"{year}/{quarter}", input_):
+                if fnmatch(f"{year}/{quarter}", mask):
                     n_count = save_master_idx(
-                        output_table_name=output,
+                        output_table_name=tables_map["full-idx"],
                         year=year,
                         quarter=quarter,
                         form_type_filter=form_type,
-                        tags=tags,
                     )
                     if n_count:
                         print(f"Saved {n_count} records for {year}-QTR{quarter}")
@@ -205,9 +194,9 @@ def main(
     if action == "init-search-phrases":
         print("Initializing search phrase embeddings...")
         create_search_phrase_embeddings(
-            output,
+            tables_map["search"],
             model=GEMINI_EMBEDDING_MODEL,
-            tags=tags,
+            tag=tag,
             dimension=dimension,
         )
         return
@@ -217,7 +206,8 @@ def main(
         result = gather_extractin_result(
             idx_table_name="master_idx_sample",
             extraction_result_table_name="trustee_comp_results",
-            tag=input_tag,
+            idx_tag=tag,
+            result_tag=result_tag,
         )
         with open(output, "w") as f:
             for row in result:
@@ -227,29 +217,22 @@ def main(
         print(f"Exported {len(result)} records to {output}")
         return
 
-    print(f"Running {action} with tags {tags} and output to {output}")
-
-    # TODO: remove hard coded table names
-    text_table_name = "filing_text_chunks"
-    search_phrase_table_name = "search_phrase_embeddings"
+    print(f"Running {action} with tag {tag}")
 
     # list of arguments to pass to process_filing
     args = [
         {
             "action": action,
-            "dimension": dimension,
+            "tables_map": tables_map,
             "cik": cik,
             "accession_number": accession_number,
-            "input_table": input_,
-            "input_tag": input_tag,
-            "output_tags": tags,
+            "tag": tag,
+            "result_tags": result_tag,
             "model": model,
-            "output_table": output,
+            "dimension": dimension,
             "form_type": form_type,
-            "search_phrase_table_name": search_phrase_table_name,
-            "text_table_name": text_table_name,
         }
-        for cik, accession_number in list(enumerate_filings(input_tag, batch_limit))
+        for cik, accession_number in list(enumerate_filings(tag, batch_limit))
     ]
 
     if workers == 1:

@@ -17,7 +17,7 @@ from .llm.algo import (
     relevance_by_distance,
 )
 from .llm.embedding import batch_embedding
-from .llm.extraction import ask_model, extract_json_from_response
+from .llm.extraction import ask_model, remove_md_json_wrapper
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ Please remove the leading $ sign and comma from compensation Amount.
 
 
 def create_search_phrase_embeddings(
-    table_name: str, model: str, tags: list[str], dimension: int
+    table_name: str, model: str, tag: str, dimension: int
 ) -> None:
     table_name = "search_phrase_embeddings"
 
@@ -100,10 +100,10 @@ def create_search_phrase_embeddings(
         for phrase, embedding in zip(TRUSTEE_COMP_SEARCH_PHRASES, embeddings)
     ]
     for item in data:
-        item["tags"] = tags
+        item["tags"] = [tag]
 
     try:
-        execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([tags],))
+        execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([tag],))
     except DatabaseException as e:
         if "does not exist" not in str(e):
             raise e
@@ -121,7 +121,6 @@ def extract_trustee_comp(
     text_table_name: str,
     embedding_table_name: str,
     search_phrase_tag: str,
-    tag: str,
     model: str,
 ) -> dict[str, Any] | None:
     # the extractino process has 4 steps
@@ -137,22 +136,24 @@ def extract_trustee_comp(
         text_table_name=text_table_name,
         embedding_table_name=embedding_table_name,
         search_phrase_table_name=search_phrase_table_name,
-        tag=tag,
         search_phrase_tag=search_phrase_tag,
         method="distance",
     )
     if relevant_text and len(relevant_text) > 100:
         # step 4: send the relevant text to the LLM model with designed prompt
-        response, comp_info = _ask_model_about_trustee_comp(model, relevant_text)
-        if response and comp_info:
-            n_trustee = len(comp_info["trustees"]) if comp_info else 0
+        response = _ask_model_about_trustee_comp(model, relevant_text)
+        if response:
+            try:
+                comp_info = json.loads(response)
+                n_trustee = len(comp_info["trustees"])
+            except json.JSONDecodeError:
+                n_trustee = 0
+
             return {
                 "cik": cik,
                 "accession_number": accession_number,
                 "model": model,
-                "tags": [tag],
                 "response": response,
-                "comp_info": json.dumps(comp_info),
                 "n_trustee": n_trustee,
                 "selected_chunks": relevant_chunks,
                 "selected_text": relevant_text,
@@ -170,7 +171,6 @@ def _find_relevant_text(
     text_table_name: str,
     embedding_table_name: str,
     search_phrase_table_name: str,
-    tag: str,
     search_phrase_tag: str,
     method: str = "distance",
 ) -> tuple[list[int], str]:
@@ -180,7 +180,6 @@ def _find_relevant_text(
         embedding_table_name=embedding_table_name,
         search_phrase_table_name=search_phrase_table_name,
         search_phrase_tag=search_phrase_tag,
-        embedding_tag=tag,
         limit=12,  # 3 records each for 4 search phrases
     )
 
@@ -200,7 +199,6 @@ def _find_relevant_text(
         table_name=text_table_name,
         cik=cik,
         accession_number=accession_number,
-        tag=tag,
         chunk_nums=selected_chunks,
     )
 
@@ -210,7 +208,7 @@ def _find_relevant_text(
         return [], ""
 
 
-def _ask_model_about_trustee_comp(model: str, relevant_text: str):
+def _ask_model_about_trustee_comp(model: str, relevant_text: str) -> str | None:
     start_t = datetime.now()
     prompt = TRUSTEE_COMP_PROMPT.replace("{SEC_FILING_SNIPPET}", relevant_text)
     response = ask_model(model, prompt)
@@ -220,8 +218,6 @@ def _ask_model_about_trustee_comp(model: str, relevant_text: str):
     )
 
     if response:
-        comp_info_json = extract_json_from_response(response)
-        comp_info = json.loads(comp_info_json) if comp_info_json else None
-        return response, comp_info
+        return remove_md_json_wrapper(response)
 
-    return None, None
+    return None

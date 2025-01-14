@@ -20,9 +20,20 @@ run_models = os.environ.get("PYTEST_RUN_MODELS", "0") == "1"
 def test_process_filing(clean_db):
     """take one simple filing and run through the entire flow"""
 
+    # default table names
+    tables_map = {
+        "full-idx": "master_idx",
+        "idx": "master_idx_sample",
+        "text": "filing_text_chunks",
+        "embedding": "filing_chunks_embeddings",
+        "result": "trustee_comp_results",
+        "search": "search_phrase_embeddings",
+    }
+
     # table names used for testing
     dimension = 768
-    tag = "pytest"
+    idx_tag = "pytest"
+    result_tag = "result-pytest"
 
     # simple filing
     cik = "1002427"
@@ -30,62 +41,54 @@ def test_process_filing(clean_db):
     form_type = "485BPOS"
 
     create_search_phrase_embeddings(
-        "search_phrase_embeddings",
+        tables_map["search"],
         model=GEMINI_EMBEDDING_MODEL,
-        tags=[tag],
+        tag=idx_tag,
         dimension=dimension,
     )
 
     result = process_filing(
-        cik=cik,
-        accession_number=accession_number,
         action="chunk",
-        input_table="master_idx_sample",
-        input_tag=tag,
-        output_table="filing_text_chunks",
-        output_tags=[tag],
-        form_type=form_type,
+        tables_map=tables_map,
+        cik=cik,
+        accession_number=accession_number,
+        idx_tag=idx_tag,
+        result_tag=result_tag,
         model="",
-        text_table_name="",
-        search_phrase_table_name="",
         dimension=dimension,
+        form_type=form_type,
     )
     assert result
 
     result = process_filing(
-        cik=cik,
-        accession_number=accession_number,
         action="embedding",
-        input_table="filing_text_chunks",
-        input_tag=tag,
-        output_table="filing_chunks_embeddings",
-        output_tags=[tag],
-        form_type=form_type,
+        tables_map=tables_map,
+        cik=cik,
+        accession_number=accession_number,
+        idx_tag=idx_tag,
+        result_tag=result_tag,
         model=GEMINI_EMBEDDING_MODEL,
-        text_table_name="filing_text_chunks",
-        search_phrase_table_name="search_phrase_embeddings",
         dimension=dimension,
+        form_type=form_type,
     )
     assert result
 
     result = process_filing(
+        action="extract",
+        tables_map=tables_map,
         cik=cik,
         accession_number=accession_number,
-        action="extract",
-        input_table="filing_chunks_embeddings",
-        input_tag=tag,
-        output_table="trustee_comp_results",
-        output_tags=[tag],
-        form_type=form_type,
+        idx_tag=idx_tag,
+        result_tag=result_tag,
         model="gemini-1.5-flash-002",
-        text_table_name="filing_text_chunks",
-        search_phrase_table_name="search_phrase_embeddings",
         dimension=dimension,
+        form_type=form_type,
     )
     assert result
 
 
 def test_sleuth_cli():
+    # TODO: add more tests for CLI parameters
     runner = CliRunner()
     runner.invoke(main, ["chunk"])
 
@@ -97,7 +100,6 @@ def test_save_master_idx(clean_db):
             year=2020,
             quarter=1,
             form_type_filter="485BPOS",
-            tags=["pytest"],
         )
         == 1824
     )

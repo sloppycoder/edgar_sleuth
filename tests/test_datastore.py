@@ -30,7 +30,6 @@ def test_get_n_save_chunks(clean_db):
         accession_number=accession_number,
         chunks=text_chunks,
         table_name=table_name,
-        tags=["testing", "pytest"],
         create_table=True,
     )
 
@@ -38,7 +37,6 @@ def test_get_n_save_chunks(clean_db):
         cik=cik,
         accession_number=accession_number,
         table_name=table_name,
-        tag="pytest",
     )
     assert result and len(result) == 5
     assert "quickly in fog" in result[1]["chunk_text"]
@@ -47,7 +45,6 @@ def test_get_n_save_chunks(clean_db):
         cik=cik,
         accession_number=accession_number,
         table_name=table_name,
-        tag="pytest",
         chunk_nums=[1, 3],
     )
     assert result and len(result) == 2
@@ -66,7 +63,6 @@ def test_save_embedding_chunks(clean_db):
         accession_number="0001111111-88-666666",
         chunks=embedding_chunks,
         table_name="filing_chunks_embeddings",
-        tags=["testing", "pytest"],
         create_table=True,
     )
 

@@ -35,26 +35,24 @@ def ask_model(model: str, prompt: str) -> Optional[str]:
         raise ValueError(f"Unknown model: {model}")
 
 
-def extract_json_from_response(response: str) -> str | None:
+def remove_md_json_wrapper(response: str) -> str | None:
     # the response should be a JSON
     # sometimes Gemini wraps it in a markdown block ```json ...```
     # so we unrap the markdown block and get to the json
-    if len(response) < 20:
-        return None
+    if len(response) > 20:
+        json_str = response.strip()
+        start_markdown_index = response.find("```json")
+        end_markdown__index = response.rfind("```")
+        if start_markdown_index >= 0 and end_markdown__index >= 0:
+            json_str = response[start_markdown_index + 7 : end_markdown__index]
 
-    json_str = response.strip()
-    start_markdown_index = response.find("```json")
-    end_markdown__index = response.rfind("```")
-    if start_markdown_index >= 0 and end_markdown__index >= 0:
-        json_str = response[start_markdown_index + 7 : end_markdown__index]
+        try:
+            json.loads(json_str)  # just to test if the json is valid
+            return json_str
+        except json.JSONDecodeError:
+            logger.info("Failed to parse JSON from response")
 
-    try:
-        json.loads(json_str)  # just to test if the json is valid
-        return json_str
-    except json.JSONDecodeError:
-        logger.warning("Failed to parse JSON from response")
-
-    return None
+    return response
 
 
 def _chat_with_gpt(model_name: str, prompt: str) -> Optional[str]:

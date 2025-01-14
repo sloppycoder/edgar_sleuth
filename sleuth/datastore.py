@@ -30,7 +30,6 @@ def relevant_chunks_with_distances(
     embedding_table_name: str,
     search_phrase_table_name: str,
     search_phrase_tag: str,
-    embedding_tag: str,
     limit: int = 1000,
 ):
     """
@@ -43,17 +42,17 @@ def relevant_chunks_with_distances(
             embedding <=> phrase_embedding as distance
         FROM
             {search_phrase_table_name} phrases,
-            {embedding_table_name} docs
+            {embedding_table_name}
         WHERE
             cik = %s AND accession_number = %s
-            AND %s = ANY(phrases.tags) AND %s = ANY(docs.tags)
+            AND %s = ANY(phrases.tags)
         ORDER BY
             embedding <=> phrase_embedding
         LIMIT {limit};
     """
     result = execute_query(
         query,
-        (cik, accession_number, search_phrase_tag, embedding_tag),
+        (cik, accession_number, search_phrase_tag),
     )
     return result
 
@@ -62,7 +61,6 @@ def get_chunks(
     cik: str,
     accession_number: str,
     table_name: str,
-    tag: str,
     chunk_nums: list[int] = [],
 ) -> list[dict[str, Any]]:
     col = "embeddings" if "embedding" in table_name else "chunk_text"
@@ -70,9 +68,9 @@ def get_chunks(
     query = f"""
         SELECT cik, accession_number, chunk_num, {col}
         FROM {table_name}
-        WHERE cik = %s AND accession_number = %s AND %s = ANY(tags)
+        WHERE cik = %s AND accession_number = %s
     """
-    params = (cik, accession_number, tag)
+    params = (cik, accession_number)
     if chunk_nums:
         query += " AND chunk_num = ANY(%s)"
         params += (chunk_nums,)
@@ -85,7 +83,6 @@ def save_chunks(
     accession_number: str,
     chunks: list[str] | list[list[float]],
     table_name: str,
-    tags: list[str] = [],
     create_table: bool = False,
 ) -> None:
     if len(chunks) == 0:
@@ -103,7 +100,6 @@ def save_chunks(
             accession_number,
             chunk_num,
             text_or_embedding,
-            tags,
         )
         for chunk_num, text_or_embedding in enumerate(chunks)
     ]
@@ -111,8 +107,8 @@ def save_chunks(
         col = "embedding" if dimension > 10 else "chunk_text"
         cur.executemany(
             f"""
-            INSERT INTO {table_name} (cik, accession_number, chunk_num, {col}, tags)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO {table_name} (cik, accession_number, chunk_num, {col})
+            VALUES (%s, %s, %s, %s)
             """,  # pyright: ignore
             data,
         )
@@ -141,7 +137,7 @@ def execute_query(query: str, params: tuple | None = None) -> list[dict[str, Any
             logger.info(f"Syntax error: {str(e)} {query}")
             raise DatabaseException(str(e)) from e
         except psycopg.Error as e:
-            if not isinstance(e, psycopg.errors.UndefinedTable):
+            if isinstance(e, psycopg.errors.UndefinedTable):
                 logger.info(f"Table does not exist: {str(e)}")
             else:
                 logger.info(f"Database error: {e} when executing {query}")
@@ -181,11 +177,12 @@ def execute_insertmany(
         logger.info(f"Syntax error: {str(e)} {query}")
         raise DatabaseException from e
     except psycopg.Error as e:
-        logger.info(f"Database error: {e} when executing {query}")
+        if isinstance(e, psycopg.errors.UndefinedTable):
+            logger.info(f"Table does not exist: {str(e)}")
+        else:
+            logger.info(f"Database error: {e} when executing {query}")
         _conn().rollback()
-        raise DatabaseException from e
-
-    return False
+        raise DatabaseException(str(e)) from e
 
 
 def _create_table(table_name: str, dimension: int = 0):
@@ -195,8 +192,7 @@ def _create_table(table_name: str, dimension: int = 0):
             cik VARCHAR(10) NOT NULL,
             accession_number VARCHAR(20) NOT NULL,
             chunk_num INTEGER NOT NULL,
-            chunk_text TEXT NOT NULL,
-            tags TEXT[])
+            chunk_text TEXT NOT NULL)
         """
     elif table_name.startswith("filing_chunks_embeddings"):
         statement = f"""
@@ -204,8 +200,7 @@ def _create_table(table_name: str, dimension: int = 0):
             cik VARCHAR(10) NOT NULL,
             accession_number VARCHAR(20) NOT NULL,
             chunk_num INTEGER NOT NULL,
-            embedding VECTOR ({dimension}) NOT NULL,
-            tags TEXT[])
+            embedding VECTOR ({dimension}) NOT NULL)
         """
     elif table_name.startswith("search_phrase_embeddings"):
         statement = f"""
@@ -235,8 +230,7 @@ def _create_table(table_name: str, dimension: int = 0):
             form_type VARCHAR(16) NOT NULL,
             date_filed DATE NOT NULL,
             idx_filename VARCHAR(255) NOT NULL,
-            accession_number VARCHAR(20) NOT NULL,
-            tags TEXT[]
+            accession_number VARCHAR(20) NOT NULL
         )"""
     else:
         raise ValueError(f"Do not know how to create table {table_name}")

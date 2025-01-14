@@ -22,21 +22,3 @@ simple rules of separation
 * ```edgar``` deals with EDGAR website. only side effect it produces is writing files to the local cache.
 * ```processor``` is the glue. Use the tools provided by ```llm```,  ```splitter```and ```edgar``` and interact with the ```datastore```. It also contains the control flows.
 * ```trustee``` should contain only Trustee related functionality.
-
-## record tagging
-
-```tags``` column uses PostgreSQL array type ```TEXT[]```, so each record can have multiple tags for flexiblity. In generate multiple tags can be tags to a record during save, e.g. ```chunk_filing``` and ```get_embedding```, but only one tags can be specified when reading, e.g. ```...```.
-
-Also, when performing embedding and extraction, the same tag must exist on both text chunks table and embedding table in order to correlate.
-
-## Process Flow
-
-1. load index ```load-index="year/quarter" --tags=sometag --table-name="sometable"```
-2. chunk ```chunk --tag=tag_for_index --tags=tag_for_text_chunks --table-name="sometable"```
-3. embedding ```embedding --model="openai/gemini" --dimension=768 --tag=text_chunks_tag --tags=embedding_tag --table-name="sometable"``` (embedding table better incldue text chunk?)
-4. initialize search phrase ```init-search --model="openai/gemini" --tag=search_phrase_tag --table-name="sometable"```
-5. extraction ```extract --model="openai/gemini" --search-phrase-table="some_table" --search-phrase-tag="gemini768" --embedding-table="table_name" --embedding-tag="tag" --output-table="trust_comp" --tags=comp_result_tag```
-6. export result ```export --result-table="" --result-tag=x --embedding-table="" --embedding-tag=x --index-table="" --index-tag ".."
-
---tags: write tags
---output-table="..."
