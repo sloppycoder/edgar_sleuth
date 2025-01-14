@@ -187,9 +187,9 @@ def test_load_index(clean_db):
     runner = CliRunner()
     result = runner.invoke(
         main,
-        shlex.split('load-index --mask="2020/1" --table full-idx=master_idx_pytest'),
+        shlex.split('load-index --mask="2020/1" --table full-idx=master_idx_pytest_2'),
     )
     assert result.exit_code == 0
 
-    result = execute_query("SELECT COUNT(*) FROM master_idx_pytest")
+    result = execute_query("SELECT COUNT(*) FROM master_idx_pytest_2")
     assert result and result[0]["count"] == 1824
