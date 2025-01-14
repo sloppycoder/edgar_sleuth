@@ -277,4 +277,13 @@ def main(
 
 
 if __name__ == "__main__":
+    # the database connection is a singleton within this application.
+    # on linux, multiprocessing uses fork() to create new processes
+    # so the same connection is shared across all processes.
+    # this will lead to funny error message like
+    # "Error prepared statement "_pg3_0" already exists ...
+    # the statement below force the use of spawn() method to create
+    # new processes on Linux in order to avoid this issue
+    # spawn() is default on macOS and Windows anyways.
+    multiprocessing.set_start_method("spawn")
     main(sys.argv[1:])
