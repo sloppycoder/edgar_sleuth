@@ -97,17 +97,6 @@ def save_chunks(
     if create_table:
         _create_table(table_name, dimension=dimension)
 
-    try:
-        _conn().execute(
-            f"""
-            DELETE FROM {table_name} WHERE cik = %s
-            AND accession_number = %s AND tags = %s
-        """,  # pyright: ignore
-            (cik, accession_number, tags),
-        )
-    except psycopg.errors.UndefinedTable:
-        _conn().rollback()
-
     data = [
         (
             cik,

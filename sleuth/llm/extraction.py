@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, Optional
+from typing import Optional
 
 from google.api_core.exceptions import ResourceExhausted
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -35,12 +35,12 @@ def ask_model(model: str, prompt: str) -> Optional[str]:
         raise ValueError(f"Unknown model: {model}")
 
 
-def extract_json_from_response(response: str) -> dict[str, Any]:
+def extract_json_from_response(response: str) -> str | None:
     # the response should be a JSON
     # sometimes Gemini wraps it in a markdown block ```json ...```
     # so we unrap the markdown block and get to the json
     if len(response) < 20:
-        return {}
+        return None
 
     json_str = response.strip()
     start_markdown_index = response.find("```json")
@@ -49,11 +49,12 @@ def extract_json_from_response(response: str) -> dict[str, Any]:
         json_str = response[start_markdown_index + 7 : end_markdown__index]
 
     try:
-        return json.loads(json_str)
+        json.loads(json_str)  # just to test if the json is valid
+        return json_str
     except json.JSONDecodeError:
         logger.warning("Failed to parse JSON from response")
 
-    return {}
+    return None
 
 
 def _chat_with_gpt(model_name: str, prompt: str) -> Optional[str]:

@@ -159,7 +159,7 @@ def extract_trustee_comp(
             }
 
     logger.info(
-        f"No relevant text found for {cik},{accession_number} with tags {search_phrase_tag} and {tag}"  # noqa E501
+        f"no relevant text found for {cik},{accession_number} with tags {search_phrase_tag} and {tag}"  # noqa E501
     )
     return None
 
@@ -220,6 +220,8 @@ def _ask_model_about_trustee_comp(model: str, relevant_text: str):
     )
 
     if response:
-        comp_info = extract_json_from_response(response)
+        comp_info_json = extract_json_from_response(response)
+        comp_info = json.loads(comp_info_json) if comp_info_json else None
         return response, comp_info
+
     return None, None

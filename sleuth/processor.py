@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime
 from logging.handlers import QueueHandler
@@ -33,7 +32,7 @@ def save_filing_embeddings(
     tags: list[str],
     embedding_table_name: str = "",  # leave empty to skip saving to database
     model: str = GEMINI_EMBEDDING_MODEL,
-) -> int:
+) -> int | None:
     logger.debug(
         f"save_filing_embeddings for {cik},{accession_number} with dimension {dimension}, input_tag={input_tag}, tags={tags}, model={model}"  # noqa E501
     )
@@ -47,8 +46,8 @@ def save_filing_embeddings(
             """
             result = execute_query(query, (cik, accession_number, tags))
             if result and result[0]["count"] > 0:
-                logger.info(
-                    f"{cik} {accession_number} already has embeddings, skipping..."
+                logger.debug(
+                    f"{cik} {accession_number} already has embeddings, skipping calling embedding API"  # noqa E501
                 )
                 return result[0]["count"]
         except DatabaseException as e:
@@ -86,7 +85,7 @@ def save_filing_embeddings(
             )
         return len(embeddings)
 
-    return 0
+    return None
 
 
 def chunk_filing(
@@ -95,7 +94,7 @@ def chunk_filing(
     method: str = "spacy",
     tags: list[str] = [],
     table_name: str = "",  # leave empty if dryrun
-) -> tuple[int, list[str]]:
+) -> tuple[int, list[str]] | tuple[None, None]:
     logger.debug(f"chunk_filing form {form_type} of {filing}")
 
     if filing:
@@ -103,7 +102,7 @@ def chunk_filing(
 
         if not filing_path.endswith(".html") and not filing_path.endswith(".htm"):
             logger.info(f"{filing_path} is not html file, skipping...")
-            return 0, []
+            return None, None
 
         # check if the filing is already chunk
         if table_name:
@@ -146,7 +145,7 @@ def chunk_filing(
                 )
             return len(chunks), chunks
 
-    return 0, []
+    return None, None
 
 
 def gather_extractin_result(
@@ -182,9 +181,7 @@ def gather_extractin_result(
             and row["trustees_comp"]
             and row["trustees_comp"].startswith("```json")
         ):
-            row["trustees_comp"] = json.dumps(
-                extract_json_from_response(row["trustees_comp"])
-            )
+            row["trustees_comp"] = extract_json_from_response(row["trustees_comp"])
     return rows
 
 
@@ -215,7 +212,7 @@ def process_filing(
             tags=output_tags,
             table_name=output_table,
         )
-        if n_chunks > 1:
+        if n_chunks:
             log_n_print(f"{key} {form_type} splitted into {n_chunks} chunks")
             return True
         else:
@@ -232,7 +229,7 @@ def process_filing(
             embedding_table_name=output_table,
             dimension=dimension,
         )
-        if n_embeddings > 1:
+        if n_embeddings:
             log_n_print(f"Saved {n_embeddings} embeddings for {key} {form_type}")
             return True
         else:
