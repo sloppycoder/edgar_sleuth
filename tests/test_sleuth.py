@@ -187,7 +187,7 @@ def test_load_index(clean_db):
     runner = CliRunner()
     result = runner.invoke(
         main,
-        shlex.split('load-index --mask="2020/1" --table full-idx=master_idx_pytest_2'),
+        shlex.split('load-index "2020/1" --table full-idx=master_idx_pytest_2'),
     )
     assert result.exit_code == 0
 

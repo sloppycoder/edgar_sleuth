@@ -6,7 +6,7 @@ Using LLM to extract information from filings on SEC EDGAR website.
 ```shell
 
 # load index, thos step loads all records in master_idx
-python -m sleuth load-index --mask="2024/*"
+python -m sleuth load-index "2024/*"
 
 # manually select and tag records and save them to master_idx_sample
 # currently it samples 10% of all companies filed between 2023-2024
@@ -20,14 +20,14 @@ python -m sleuth chunk --tag=10pct  --workers=6  \
 
 # embedding
 python -m sleuth embedding --tag=10pct --workers=4 \
-  --model gemini --dimension 768\
+  --model gemini --dimension 768 \
   --table text=filing_text_chunks \
   --table embedding=filing_chunks_embeddings
 
 
 # embedding
 python -m sleuth init-search-phrases --tag=10pct \
-  --model gemini --dimension 768\
+  --model gemini --dimension 768 \
   --table search=search_phrase_embeddings
 
 
@@ -40,19 +40,9 @@ python -m sleuth extract --tag=10pct --result-tag=batch890 --workers=3 \
   --table result=trustee_comp_result \
   --model gemini-1.5-flash-002
 
+# export extraction result
 python -m sleuth export --tag=10pct --result-tag=batch890 \
   --table idx=master_idx_sample \
   --table text=filing_text_chunks \
   --table embedding=filing_chunks_embeddings \
   --table result=trustee_comp_result
-
-action
-table, multiple
-tag
-result-tag
-worker
-dimension
-model
-
-tag required except load-index
-result-tag required for extract and export

@@ -37,7 +37,7 @@ def save_master_idx(
     quarter: int,
     form_type_filter: str,
     output_table_name: str,
-) -> int:
+) -> int | None:
     rows = read_master_idx(year, quarter, form_type_filter)
     if len(rows) == 0:
         logger.error(f"No records found for {year} Q{quarter} {form_type_filter}")
@@ -45,9 +45,9 @@ def save_master_idx(
 
     if execute_insertmany(output_table_name, rows, create_table=True):
         return len(rows)
-    else:
-        logger.error(f"Failed to save master idx for {year} Q{quarter}")
-        return 0
+
+    logger.error(f"Failed to save master idx for {year} Q{quarter}")
+    return None
 
 
 def enumerate_filings(
@@ -86,10 +86,9 @@ def enumerate_filings(
         case_sensitive=False,
     ),
 )
-@click.option(
-    "--mask",
+@click.argument(
+    "index-range",
     required=False,
-    help="Range of indexes to load, can use wildcards, e.g. 2020/*",
 )
 @click.option(
     "--output",
@@ -147,10 +146,18 @@ def main(
     dimension: int,
     batch_limit: int,
     workers: int,
-    mask: str,
+    index_range: str,
     output: str,
 ) -> None:
-    # checking and setting default for parameters
+    if action not in ["load-index"] and not tag:
+        raise click.UsageError(f"--tag is required for {action}")
+
+    if action in ["extract", "export"] and not result_tag:
+        raise click.UsageError(f"--result-tag is required for {action}")
+
+    if action == "load-index" and not index_range:
+        raise click.UsageError(f"index-range is required for {action}")
+
     form_type = "485BPOS"
 
     # default table names
@@ -174,16 +181,10 @@ def main(
     else:
         model = "gemini-1.5-flash-002" if model == "gemini" else "gpt-4o-mini"
 
-    if action not in ["load-index"] and not tag:
-        raise click.UsageError(f"--tag is required for {action}")
-
-    if action in ["extract", "export"] and not result_tag:
-        raise click.UsageError(f"--result-tag is required for {action}")
-
     if action == "load-index":
         for year in range(1995, 2025):
             for quarter in range(1, 5):
-                if fnmatch(f"{year}/{quarter}", mask):
+                if fnmatch(f"{year}/{quarter}", index_range):
                     n_count = save_master_idx(
                         output_table_name=tables_map["full-idx"],
                         year=year,
