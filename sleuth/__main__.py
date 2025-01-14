@@ -121,6 +121,11 @@ def enumerate_filings(
     help="tags used to query input",
 )
 @click.option(
+    "--result-tag",
+    required=False,
+    help="tags used to save extraction result",
+)
+@click.option(
     "--dimension",
     type=int,
     default=768,

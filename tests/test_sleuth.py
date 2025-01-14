@@ -1,9 +1,12 @@
 import os
+import shlex
+import unittest.mock
 
 import pytest
 from click.testing import CliRunner
 
 from sleuth.__main__ import main, save_master_idx
+from sleuth.datastore import execute_insertmany
 from sleuth.llm.embedding import GEMINI_EMBEDDING_MODEL
 from sleuth.processor import process_filing
 from sleuth.trustee import (
@@ -87,10 +90,37 @@ def test_process_filing(clean_db):
     assert result
 
 
-def test_sleuth_cli():
+@pytest.mark.skipif(
+    not run_models or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") is None,
+    reason="reduce runtime and cost for API calling",
+)
+def test_sleuth_cli(clean_db):
+    idx_tag = "pytest-cli-test"
+    test_filing = {
+        "cik": "1002427",
+        "accession_number": "0001133228-24-004879",
+        "date_filed": "2024-01-29",  # not important
+        "company_name": "VANGUARD GROUP INC",
+        "form_type": "485BPOS",
+        "idx_filename": "0001133228-24-004879.txt",  # not important
+        "tags": [idx_tag],
+    }
+    execute_insertmany("master_idx_sample", [test_filing], create_table=True)
+
     # TODO: add more tests for CLI parameters
-    runner = CliRunner()
-    runner.invoke(main, ["chunk"])
+    with unittest.mock.patch("sleuth.__main__.process_filing", ret_val=True) as the_mock:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            shlex.split(f"chunk --tag={idx_tag}"),
+        )
+
+        assert result.exit_code == 0
+        assert the_mock.call_count == 1
+
+        _, kwargs = the_mock.call_args
+        assert kwargs["actions"] == ["chunk"]
+        assert kwargs["accession_number"] == "0001133228-24-004879"
 
 
 def test_save_master_idx(clean_db):

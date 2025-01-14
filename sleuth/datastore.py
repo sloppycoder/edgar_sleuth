@@ -230,7 +230,8 @@ def _create_table(table_name: str, dimension: int = 0):
             form_type VARCHAR(16) NOT NULL,
             date_filed DATE NOT NULL,
             idx_filename VARCHAR(255) NOT NULL,
-            accession_number VARCHAR(20) NOT NULL
+            accession_number VARCHAR(20) NOT NULL,
+            tags TEXT[]
         )"""
     else:
         raise ValueError(f"Do not know how to create table {table_name}")
