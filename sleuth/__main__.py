@@ -256,17 +256,22 @@ def main(
         q_listener = QueueListener(logging_q, handler)  # pyright: ignore
         q_listener.start()
 
-        with multiprocessing.Pool(
-            workers,
-            init_worker,
-            (
-                logging_q,
-                logging.DEBUG,
-            ),
-        ) as pool:
-            pool.map(process_filing_wrapper, args)
+        try:
+            with multiprocessing.Pool(
+                workers,
+                init_worker,
+                (
+                    logging_q,
+                    logging.DEBUG,
+                ),
+            ) as pool:
+                pool.map(process_filing_wrapper, args)
 
-        q_listener.stop()
+            q_listener.stop()
+        finally:
+            if logging_q:
+                logging_q.close()
+                logging_q.join_thread()
 
 
 if __name__ == "__main__":
