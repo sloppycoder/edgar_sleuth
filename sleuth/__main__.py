@@ -182,7 +182,7 @@ def main(
     if action not in ["load-index", "init-search-phrases"] and not input_tag:
         raise click.UsageError("--input-tag is required")
 
-    if action not in ["load-index"] and not tags:
+    if action not in ["load-index", "export"] and not tags:
         raise click.UsageError("output tags is required")
 
     if action == "load-index":
