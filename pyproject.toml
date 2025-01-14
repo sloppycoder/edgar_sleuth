@@ -1,6 +1,6 @@
 [project]
 name = "edgar_sleuth"
-version = "0.4.0"
+version = "0.5.0"
 description = "Copier template for generic Python 3 project with tooling configuration for testing, linting and IDE support"
 authors = [{ name = "Li Lin", email = "guru.lin@gmail.com" }]
 readme = "README.md"
