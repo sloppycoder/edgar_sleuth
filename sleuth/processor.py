@@ -4,7 +4,13 @@ from datetime import datetime
 from logging.handlers import QueueHandler
 from typing import Any
 
-from .datastore import execute_insertmany, execute_query, get_chunks, save_chunks
+from .datastore import (
+    DatabaseException,
+    execute_insertmany,
+    execute_query,
+    get_chunks,
+    save_chunks,
+)
 from .edgar import SECFiling
 from .llm.embedding import GEMINI_EMBEDDING_MODEL, batch_embedding
 from .splitter import chunk_text, trim_html_content
@@ -34,14 +40,20 @@ def save_filing_embeddings(
 
     # check if embeddings already exist
     if embedding_table_name:
-        query = f"""
-            SELECT COUNT(*) AS COUNT FROM {embedding_table_name}
-            WHERE cik = %s AND accession_number = %s AND tags = %s
-        """
-        result = execute_query(query, (cik, accession_number, tags))
-        if result and result[0]["count"] > 0:
-            logger.info(f"{cik} {accession_number} already has embeddings, skipping...")
-            return result[0]["count"]
+        try:
+            query = f"""
+                SELECT COUNT(*) AS COUNT FROM {embedding_table_name}
+                WHERE cik = %s AND accession_number = %s AND tags = %s
+            """
+            result = execute_query(query, (cik, accession_number, tags))
+            if result and result[0]["count"] > 0:
+                logger.info(
+                    f"{cik} {accession_number} already has embeddings, skipping..."
+                )
+                return result[0]["count"]
+        except DatabaseException as e:
+            if "does not exist" not in str(e):
+                raise e
 
     text_chunks_records = get_chunks(
         cik=cik,
@@ -95,17 +107,21 @@ def chunk_filing(
 
         # check if the filing is already chunk
         if table_name:
-            existing_chunks = get_chunks(
-                cik=filing.cik,
-                accession_number=filing.accession_number,
-                table_name=table_name,
-                tag=tags[0] if tags else "",
-            )
-            if existing_chunks:
-                logger.info(f"{filing.cik} {filing.accession_number} already chunked")
-                return len(existing_chunks), [
-                    record["chunk_text"] for record in existing_chunks
-                ]
+            try:
+                existing_chunks = get_chunks(
+                    cik=filing.cik,
+                    accession_number=filing.accession_number,
+                    table_name=table_name,
+                    tag=tags[0] if tags else "",
+                )
+                if existing_chunks:
+                    logger.info(f"{filing.cik} {filing.accession_number} already chunked")
+                    return len(existing_chunks), [
+                        record["chunk_text"] for record in existing_chunks
+                    ]
+            except DatabaseException as e:
+                if "does not exist" not in str(e):
+                    raise e
 
         trimmed_html = trim_html_content(filing_content)
         logger.debug(f"Trimmed HTML content size {len(trimmed_html)}")
