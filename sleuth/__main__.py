@@ -53,7 +53,7 @@ def save_master_idx(
 def enumerate_filings(
     tag: str,
     batch_limit: int,
-    index_table_name: str = "master_idx_sample",
+    index_table_name: str,
 ) -> Iterator[tuple[str, str]]:
     rows = execute_query(
         f"""
@@ -157,7 +157,7 @@ def main(
     tables_map = {
         "full-idx": "master_idx",
         "idx": "master_idx_sample",
-        "chunks": "filing_text_chunks",
+        "text": "filing_text_chunks",
         "embedding": "filing_chunks_embeddings",
         "result": "trustee_comp_results",
         "search": "search_phrase_embeddings",
@@ -209,8 +209,8 @@ def main(
     if action == "export":
         # TODO: remove hard coded table names
         result = gather_extractin_result(
-            idx_table_name="master_idx_sample",
-            extraction_result_table_name="trustee_comp_results",
+            idx_table_name=tables_map["idx"],
+            extraction_result_table_name=tables_map["result"],
             idx_tag=tag,
             result_tag=result_tag,
         )
@@ -231,13 +231,17 @@ def main(
             "tables_map": tables_map,
             "cik": cik,
             "accession_number": accession_number,
-            "tag": tag,
-            "result_tags": result_tag,
+            "idx_tag": tag,
+            "result_tag": result_tag,
             "model": model,
             "dimension": dimension,
             "form_type": form_type,
         }
-        for cik, accession_number in list(enumerate_filings(tag, batch_limit))
+        for cik, accession_number in list(
+            enumerate_filings(
+                tag=tag, batch_limit=batch_limit, index_table_name=tables_map["idx"]
+            )
+        )
     ]
 
     if workers == 1:

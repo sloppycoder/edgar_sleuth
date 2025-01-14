@@ -1,12 +1,11 @@
 import os
 import shlex
-import unittest.mock
 
 import pytest
 from click.testing import CliRunner
 
-from sleuth.__main__ import main, save_master_idx
-from sleuth.datastore import execute_insertmany
+from sleuth.__main__ import main
+from sleuth.datastore import execute_insertmany, execute_query
 from sleuth.llm.embedding import GEMINI_EMBEDDING_MODEL
 from sleuth.processor import process_filing
 from sleuth.trustee import (
@@ -94,8 +93,10 @@ def test_process_filing(clean_db):
     not run_models or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") is None,
     reason="reduce runtime and cost for API calling",
 )
-def test_sleuth_cli(clean_db):
+def test_sleuth_cli(tmp_path):
+    output_path = tmp_path / "output.jsonl"
     idx_tag = "pytest-cli-test"
+    result_tag = "result-pytest-cli-test"
     test_filing = {
         "cik": "1002427",
         "accession_number": "0001133228-24-004879",
@@ -105,31 +106,90 @@ def test_sleuth_cli(clean_db):
         "idx_filename": "0001133228-24-004879.txt",  # not important
         "tags": [idx_tag],
     }
-    execute_insertmany("master_idx_sample", [test_filing], create_table=True)
+    execute_insertmany("master_idx_pytest", [test_filing], create_table=True)
 
-    # TODO: add more tests for CLI parameters
-    with unittest.mock.patch("sleuth.__main__.process_filing", ret_val=True) as the_mock:
-        runner = CliRunner()
-        result = runner.invoke(
-            main,
-            shlex.split(f"chunk --tag={idx_tag}"),
-        )
+    tables_map = {
+        "idx": "master_idx_pytest",
+        "text": "filing_text_chunks_pytest",
+        "embedding": "filing_chunks_embeddings_pytest",
+        "result": "trustee_comp_results_pytest",
+        "search": "search_phrase_embeddings_pytest",
+    }
 
-        assert result.exit_code == 0
-        assert the_mock.call_count == 1
-
-        _, kwargs = the_mock.call_args
-        assert kwargs["actions"] == ["chunk"]
-        assert kwargs["accession_number"] == "0001133228-24-004879"
-
-
-def test_save_master_idx(clean_db):
-    assert (
-        save_master_idx(
-            output_table_name="master_idx",
-            year=2020,
-            quarter=1,
-            form_type_filter="485BPOS",
-        )
-        == 1824
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        shlex.split(f"""init-search-phrases --tag={idx_tag} \
+            --table search={tables_map["search"]} \
+        """),
     )
+    assert result.exit_code == 0
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        shlex.split(f"""chunk --tag={idx_tag} \
+            --table idx={tables_map['idx']} \
+            --table text={tables_map['text']} \
+        """),
+    )
+    assert result.exit_code == 0
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        shlex.split(f"""embedding --tag={idx_tag} \
+            --table idx={tables_map['idx']} \
+            --table text={tables_map['text']} \
+            --table embedding={tables_map['embedding']} \
+        """),
+    )
+    assert result.exit_code == 0
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        shlex.split(f"""extract --tag={idx_tag} --result-tag={result_tag} \
+            --table idx={tables_map['idx']}    \
+            --table text={tables_map['text']}  \
+            --table embedding={tables_map['embedding']} \
+            --table result={tables_map['result']} \
+            --table search={tables_map["search"]} \
+            --model gemini \
+        """),
+    )
+    assert result.exit_code == 0
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        shlex.split(f"""export --tag={idx_tag} --result-tag={result_tag} \
+            --output={str(output_path)} \
+            --table idx={tables_map['idx']}    \
+            --table text={tables_map['text']}  \
+            --table embedding={tables_map['embedding']} \
+            --table result={tables_map['result']} \
+        """),
+    )
+    assert result.exit_code == 0
+
+    with open(output_path, "r") as f:
+        lines = f.readlines()
+        assert len(lines) == 1
+
+    try:
+        output_path.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def test_load_index(clean_db):
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        shlex.split('load-index --mask="2020/1" --table full-idx=master_idx_pytest'),
+    )
+    assert result.exit_code == 0
+
+    result = execute_query("SELECT COUNT(*) FROM master_idx_pytest")
+    assert result and result[0]["count"] == 1824

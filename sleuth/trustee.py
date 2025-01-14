@@ -87,8 +87,6 @@ Please remove the leading $ sign and comma from compensation Amount.
 def create_search_phrase_embeddings(
     table_name: str, model: str, tag: str, dimension: int
 ) -> None:
-    table_name = "search_phrase_embeddings"
-
     embeddings = batch_embedding(
         chunks=TRUSTEE_COMP_SEARCH_PHRASES,
         model=model,
