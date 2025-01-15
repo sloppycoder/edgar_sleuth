@@ -26,13 +26,13 @@ python -m sleuth embedding --tag=10pct --workers=4 \
 
 
 # embedding
-python -m sleuth init-search-phrases --tag=10pct \
+python -m sleuth init-search-phrases --tag=group1 \
   --model gemini --dimension 768 \
   --table search=search_phrase_embeddings
 
 
 # extraction
-python -m sleuth extract --tag=10pct --result-tag=batch890 --workers=3 \
+python -m sleuth extract --tag=10pct --search-tag=group1 --result-tag=batch890 --workers=3 \
   --table idx=master_idx_sample \
   --table text=filing_text_chunks \
   --table embedding=filing_chunks_embeddings \

@@ -177,6 +177,7 @@ def process_filing(
     cik: str,
     accession_number: str,
     idx_tag: str,
+    search_tag: str,
     result_tag: str,
     model: str,
     dimension: int,
@@ -221,7 +222,7 @@ def process_filing(
             text_table_name=tables_map["text"],
             embedding_table_name=tables_map["embedding"],
             search_phrase_table_name=tables_map["search"],
-            search_phrase_tag=idx_tag,
+            search_phrase_tag=search_tag,
             model=model,
         )
 

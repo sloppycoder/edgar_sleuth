@@ -35,6 +35,7 @@ def test_process_filing(clean_db):
     # table names used for testing
     dimension = 768
     idx_tag = "pytest"
+    search_tag = "search-pytest-cli-test"
     result_tag = "result-pytest"
 
     # simple filing
@@ -45,7 +46,7 @@ def test_process_filing(clean_db):
     create_search_phrase_embeddings(
         tables_map["search"],
         model=GEMINI_EMBEDDING_MODEL,
-        tag=idx_tag,
+        search_tag=search_tag,
         dimension=dimension,
     )
 
@@ -55,6 +56,7 @@ def test_process_filing(clean_db):
         cik=cik,
         accession_number=accession_number,
         idx_tag=idx_tag,
+        search_tag=search_tag,
         result_tag=result_tag,
         model="",
         dimension=dimension,
@@ -68,6 +70,7 @@ def test_process_filing(clean_db):
         cik=cik,
         accession_number=accession_number,
         idx_tag=idx_tag,
+        search_tag=search_tag,
         result_tag=result_tag,
         model=GEMINI_EMBEDDING_MODEL,
         dimension=dimension,
@@ -81,6 +84,7 @@ def test_process_filing(clean_db):
         cik=cik,
         accession_number=accession_number,
         idx_tag=idx_tag,
+        search_tag=search_tag,
         result_tag=result_tag,
         model="gemini-1.5-flash-002",
         dimension=dimension,
@@ -96,6 +100,7 @@ def test_process_filing(clean_db):
 def test_sleuth_cli(tmp_path):
     output_path = tmp_path / "output.jsonl"
     idx_tag = "pytest-cli-test"
+    search_tag = "search-pytest-cli-test"
     result_tag = "result-pytest-cli-test"
     test_filing = {
         "cik": "1002427",
@@ -119,7 +124,7 @@ def test_sleuth_cli(tmp_path):
     runner = CliRunner()
     result = runner.invoke(
         main,
-        shlex.split(f"""init-search-phrases --tag={idx_tag} \
+        shlex.split(f"""init-search-phrases --search-tag={search_tag} \
             --table search={tables_map["search"]} \
         """),
     )
@@ -149,7 +154,8 @@ def test_sleuth_cli(tmp_path):
     runner = CliRunner()
     result = runner.invoke(
         main,
-        shlex.split(f"""extract --tag={idx_tag} --result-tag={result_tag} \
+        shlex.split(f"""extract \
+            --tag={idx_tag} --result-tag={result_tag} --search-tag={search_tag}\
             --table idx={tables_map['idx']}    \
             --table text={tables_map['text']}  \
             --table embedding={tables_map['embedding']} \

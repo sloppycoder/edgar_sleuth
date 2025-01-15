@@ -120,6 +120,11 @@ def enumerate_filings(
     help="tags used to query input",
 )
 @click.option(
+    "--search-tag",
+    required=False,
+    help="tags used for search phrases",
+)
+@click.option(
     "--result-tag",
     required=False,
     help="tags used to save extraction result",
@@ -140,6 +145,7 @@ def enumerate_filings(
 def main(
     action: str,
     tag: str,
+    search_tag: str,
     result_tag: str,
     tables: list[str],
     model: str,
@@ -149,8 +155,11 @@ def main(
     index_range: str,
     output: str,
 ) -> None:
-    if action not in ["load-index"] and not tag:
+    if action not in ["load-index", "init-search-phrases"] and not tag:
         raise click.UsageError(f"--tag is required for {action}")
+
+    if action in ["extract", "init-search-phrases"] and not search_tag:
+        raise click.UsageError(f"--search-tag is required for {action}")
 
     if action in ["extract", "export"] and not result_tag:
         raise click.UsageError(f"--result-tag is required for {action}")
@@ -202,7 +211,7 @@ def main(
         create_search_phrase_embeddings(
             tables_map["search"],
             model=GEMINI_EMBEDDING_MODEL,
-            tag=tag,
+            search_tag=search_tag,
             dimension=dimension,
         )
         return
@@ -223,7 +232,7 @@ def main(
         print(f"Exported {len(result)} records to {output}")
         return
 
-    print(f"Running {action} with tag {tag}")
+    print(f"Running {action}")
 
     # list of arguments to pass to process_filing
     args = [
@@ -233,6 +242,7 @@ def main(
             "cik": cik,
             "accession_number": accession_number,
             "idx_tag": tag,
+            "search_tag": search_tag,
             "result_tag": result_tag,
             "model": model,
             "dimension": dimension,
@@ -272,6 +282,8 @@ def main(
             if logging_q:
                 logging_q.close()
                 logging_q.join_thread()
+
+    print("Done")
 
 
 if __name__ == "__main__":

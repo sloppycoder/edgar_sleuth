@@ -85,7 +85,7 @@ Please remove the leading $ sign and comma from compensation Amount.
 
 
 def create_search_phrase_embeddings(
-    table_name: str, model: str, tag: str, dimension: int
+    table_name: str, model: str, search_tag: str, dimension: int
 ) -> None:
     embeddings = batch_embedding(
         chunks=TRUSTEE_COMP_SEARCH_PHRASES,
@@ -98,10 +98,10 @@ def create_search_phrase_embeddings(
         for phrase, embedding in zip(TRUSTEE_COMP_SEARCH_PHRASES, embeddings)
     ]
     for item in data:
-        item["tags"] = [tag]
+        item["tags"] = [search_tag]
 
     try:
-        execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([tag],))
+        execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([search_tag],))
     except DatabaseException as e:
         if "does not exist" not in str(e):
             raise e
@@ -158,7 +158,7 @@ def extract_trustee_comp(
             }
 
     logger.info(
-        f"no relevant text found for {cik},{accession_number} with tags {search_phrase_tag} and {tag}"  # noqa E501
+        f"no relevant text found for {cik},{accession_number} with tags {search_phrase_tag}"  # noqa E501
     )
     return None
 
