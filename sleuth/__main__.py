@@ -264,9 +264,10 @@ def main(
         logging_q = multiprocessing.Queue()
         handler = logging.getHandlerByName("console")  # defined in logger_config.yaml
         q_listener = QueueListener(logging_q, handler)  # pyright: ignore
-        q_listener.start()
 
         try:
+            q_listener.start()
+
             with multiprocessing.Pool(
                 workers,
                 init_worker,
@@ -277,8 +278,9 @@ def main(
             ) as pool:
                 pool.map(process_filing_wrapper, args)
 
-            q_listener.stop()
         finally:
+            if q_listener:
+                q_listener.stop()
             if logging_q:
                 logging_q.close()
                 logging_q.join_thread()
