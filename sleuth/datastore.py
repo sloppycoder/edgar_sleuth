@@ -21,7 +21,7 @@ def _conn() -> psycopg.Connection:
     database_url = os.environ.get("DATABASE_URL", "")
     if database_url:
         return psycopg.connect(database_url)
-    raise ValueError("Use datastore.init(db_url) to initialize the connection")
+    raise ValueError("DATABASE_URL is not set")
 
 
 def relevant_chunks_with_distances(

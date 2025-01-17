@@ -84,27 +84,33 @@ Please remove the leading $ sign and comma from compensation Amount.
 """  # noqa: E501
 
 
+def delete_search_pharses(table_name: str, search_tag: str) -> None:
+    try:
+        execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([search_tag],))
+    except DatabaseException as e:
+        if "does not exist" not in str(e):
+            raise e
+
+
 def create_search_phrase_embeddings(
-    table_name: str, model: str, search_tag: str, dimension: int
+    table_name: str,
+    phrases: list[str],
+    model: str,
+    search_tag: str,
+    dimension: int,
 ) -> None:
     embeddings = batch_embedding(
-        chunks=TRUSTEE_COMP_SEARCH_PHRASES,
+        chunks=phrases,
         model=model,
         task_type="RETRIEVAL_QUERY",
         dimension=dimension,
     )
     data = [
         {"phrase": phrase, "phrase_embedding": embedding}
-        for phrase, embedding in zip(TRUSTEE_COMP_SEARCH_PHRASES, embeddings)
+        for phrase, embedding in zip(phrases, embeddings)
     ]
     for item in data:
         item["tags"] = [search_tag]
-
-    try:
-        execute_query(f"DELETE FROM {table_name} WHERE tags = %s", ([search_tag],))
-    except DatabaseException as e:
-        if "does not exist" not in str(e):
-            raise e
 
     execute_insertmany(table_name=table_name, data=data, create_table=True)
     logger.info(

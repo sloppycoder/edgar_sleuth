@@ -20,7 +20,11 @@ from .processor import (
     process_filing,
     process_filing_wrapper,
 )
-from .trustee import create_search_phrase_embeddings
+from .trustee import (
+    TRUSTEE_COMP_SEARCH_PHRASES,
+    create_search_phrase_embeddings,
+    delete_search_pharses,
+)
 
 MAX_ERRORS = 5
 
@@ -208,8 +212,10 @@ def main(
 
     if action == "init-search-phrases":
         print("Initializing search phrase embeddings...")
+        delete_search_pharses(table_name=tables_map["search"], search_tag=search_tag)
         create_search_phrase_embeddings(
-            tables_map["search"],
+            table_name=tables_map["search"],
+            phrases=TRUSTEE_COMP_SEARCH_PHRASES,
             model=GEMINI_EMBEDDING_MODEL,
             search_tag=search_tag,
             dimension=dimension,

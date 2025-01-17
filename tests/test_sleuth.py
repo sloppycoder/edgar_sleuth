@@ -8,9 +8,7 @@ from sleuth.__main__ import main
 from sleuth.datastore import execute_insertmany, execute_query
 from sleuth.llm.embedding import GEMINI_EMBEDDING_MODEL
 from sleuth.processor import process_filing
-from sleuth.trustee import (
-    create_search_phrase_embeddings,
-)
+from sleuth.trustee import TRUSTEE_COMP_PROMPT, create_search_phrase_embeddings
 
 run_models = os.environ.get("PYTEST_RUN_MODELS", "0") == "1"
 
@@ -44,7 +42,8 @@ def test_process_filing(clean_db):
     form_type = "485BPOS"
 
     create_search_phrase_embeddings(
-        tables_map["search"],
+        table_name=tables_map["search"],
+        phrases=TRUSTEE_COMP_PROMPT,  # pyright: ignore
         model=GEMINI_EMBEDDING_MODEL,
         search_tag=search_tag,
         dimension=dimension,
