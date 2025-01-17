@@ -26,7 +26,7 @@ python -m sleuth embedding --tag=10pct --workers=4 \
 
 
 # embedding
-python -m sleuth init-search-phrases --tag=group1 \
+python -m sleuth init-search-phrases --search-tag=group1 \
   --model gemini --dimension 768 \
   --table search=search_phrase_embeddings
 
@@ -38,7 +38,7 @@ python -m sleuth extract --tag=10pct --search-tag=group1 --result-tag=batch890 -
   --table embedding=filing_chunks_embeddings \
   --table search=search_phrase_embeddings \
   --table result=trustee_comp_result \
-  --model gemini-1.5-flash-002
+  --model gemini
 
 # export extraction result
 python -m sleuth export --tag=10pct --result-tag=batch890 \
