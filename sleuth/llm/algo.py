@@ -1,6 +1,6 @@
-def most_relevant_chunks(relevance_scores) -> list[str]:
+def top_adjacent_chunks(relevance_scores) -> list[str]:
     """
-    select top 3 chunks, use the first one and the next one if they are adjacent
+    select top 3 chunks, return the adjacent chunks
     """
     top_chunks = [chunk_num for chunk_num, _, _, _ in relevance_scores[:3]]
     selected_chunks = []
@@ -18,6 +18,15 @@ def most_relevant_chunks(relevance_scores) -> list[str]:
         return selected_chunks
 
     return []
+
+
+def top_3_chunks(relevance_scores) -> list[str]:
+    """
+    just return top 3 chunks, sorted, regardless if they're adjacent or not
+    """
+    top_chunks = [chunk_num for chunk_num, _, _, _ in relevance_scores[:3]]
+    top_chunks.sort()
+    return top_chunks
 
 
 def relevance_by_distance(chunk_distances):

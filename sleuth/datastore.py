@@ -205,7 +205,7 @@ def _create_table(table_name: str, dimension: int = 0):
     elif table_name.startswith("search_phrase_embeddings"):
         statement = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
-            phrase VARCHAR(255) PRIMARY KEY,
+            phrase VARCHAR(255),
             phrase_embedding VECTOR({dimension}),
             tags TEXT[]
         )"""

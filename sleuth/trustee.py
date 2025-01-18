@@ -12,9 +12,10 @@ from .datastore import (
 )
 from .llm.algo import (
     gather_chunk_distances,
-    most_relevant_chunks,
     relevance_by_appearance,
     relevance_by_distance,
+    top_3_chunks,
+    top_adjacent_chunks,
 )
 from .llm.embedding import batch_embedding
 from .llm.extraction import ask_model, remove_md_json_wrapper
@@ -134,38 +135,59 @@ def extract_trustee_comp(
 
     # step 3: using search phrases to run vector search
     # use scoring alborithm to determine the most relevant text chunks
-    relevant_chunks, relevant_text = _find_relevant_text(
-        cik=cik,
-        accession_number=accession_number,
-        text_table_name=text_table_name,
-        embedding_table_name=embedding_table_name,
-        search_phrase_table_name=search_phrase_table_name,
-        search_phrase_tag=search_phrase_tag,
-        method="distance",
-    )
-    if relevant_text and len(relevant_text) > 100:
+    chunks_tried = []
+    result = {
+        "cik": cik,
+        "accession_number": accession_number,
+        "model": model,
+        "response": "",
+        "n_trustee": 0,
+        "selected_chunks": [],
+        "selected_text": "",
+    }
+
+    for method in ["distance", "appearance", "distance-any3", "appearance-any3"]:
+        relevant_chunks, relevant_text = _find_relevant_text(
+            cik=cik,
+            accession_number=accession_number,
+            text_table_name=text_table_name,
+            embedding_table_name=embedding_table_name,
+            search_phrase_table_name=search_phrase_table_name,
+            search_phrase_tag=search_phrase_tag,
+            method=method,
+        )
+
+        if (
+            relevant_chunks in chunks_tried
+            or not relevant_text
+            or len(relevant_text) < 100
+        ):  # noqa E501
+            continue
+
+        chunks_tried.append(relevant_chunks)
+        result["selected_chunks"] = relevant_chunks
+        result["selected_text"] = relevant_text
+
         # step 4: send the relevant text to the LLM model with designed prompt
         response = _ask_model_about_trustee_comp(model, relevant_text)
         if response:
             try:
                 comp_info = json.loads(response)
                 n_trustee = len(comp_info["trustees"])
+
+                if n_trustee > 1:
+                    result["n_trustee"] = n_trustee
+                    result["response"] = response
+                    return result
             except json.JSONDecodeError:
-                n_trustee = 0
+                pass
 
-            return {
-                "cik": cik,
-                "accession_number": accession_number,
-                "model": model,
-                "response": response,
-                "n_trustee": n_trustee,
-                "selected_chunks": relevant_chunks,
-                "selected_text": relevant_text,
-            }
+    if len(chunks_tried) > 0:
+        logger.info(
+            f"unable to extract trustee info for {cik},{accession_number} with tags {search_phrase_tag}"  # noqa E501
+        )
+        return result
 
-    logger.info(
-        f"no relevant text found for {cik},{accession_number} with tags {search_phrase_tag}"  # noqa E501
-    )
     return None
 
 
@@ -176,7 +198,7 @@ def _find_relevant_text(
     embedding_table_name: str,
     search_phrase_table_name: str,
     search_phrase_tag: str,
-    method: str = "distance",
+    method: str,
 ) -> tuple[list[int], str]:
     relevance_result = relevant_chunks_with_distances(
         cik=cik,
@@ -184,7 +206,7 @@ def _find_relevant_text(
         embedding_table_name=embedding_table_name,
         search_phrase_table_name=search_phrase_table_name,
         search_phrase_tag=search_phrase_tag,
-        limit=12,  # 3 records each for 4 search phrases
+        limit=20,
     )
 
     if not relevance_result:
@@ -193,11 +215,20 @@ def _find_relevant_text(
     chunk_distances = gather_chunk_distances(relevance_result)
     if method == "distance":
         relevance_scores = relevance_by_distance(chunk_distances)
-    else:
+        selected_chunks = [int(s) for s in top_adjacent_chunks(relevance_scores)]
+    elif method == "appearance":
         relevance_scores = relevance_by_appearance(chunk_distances)
+        selected_chunks = [int(s) for s in top_adjacent_chunks(relevance_scores)]
+    elif method == "distance-any3":
+        relevance_scores = relevance_by_distance(chunk_distances)
+        selected_chunks = [int(s) for s in top_3_chunks(relevance_scores)]
+    elif method == "appearance-any3":
+        relevance_scores = relevance_by_appearance(chunk_distances)
+        selected_chunks = [int(s) for s in top_3_chunks(relevance_scores)]
+    else:
+        return [], ""
 
-    selected_chunks = [int(s) for s in most_relevant_chunks(relevance_scores)]
-    logger.debug(f"Selected chunks: {selected_chunks}")
+    logger.debug(f"Selected chunks by {method}: {selected_chunks}")
 
     results = get_chunks(
         table_name=text_table_name,
