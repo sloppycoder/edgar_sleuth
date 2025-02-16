@@ -23,15 +23,16 @@ def load_mf_mapping(path: str):
 def get_mapping_from_secapi(ticker):
     global rated_limit_triggered
 
-    if rated_limit_triggered:
-        return None
-
     if not ticker or len(ticker) <= 3:
         return None
 
+    dummy_cik = "XXXX"
+    if rated_limit_triggered:
+        return dummy_cik
+
     api_key = os.getenv("SEC_API_KEY")
     if not api_key:
-        return None
+        return dummy_cik
 
     print(f"Getting mapping for {ticker} from SEC API")
 
@@ -45,14 +46,14 @@ def get_mapping_from_secapi(ticker):
             if "cik" in result[0]:
                 return result[0]["cik"]
             else:
-                return None
+                return dummy_cik
     elif response.status_code == 429:
         print("Rate limit triggered")
         rated_limit_triggered = True
-        return None
+        return dummy_cik
     else:
         print(f"Failed to get mapping for {ticker}. Got {response}")
-        return None
+        return dummy_cik
 
 
 def process_fund_list():
@@ -75,29 +76,8 @@ def process_fund_list():
     return cik_mappings
 
 
-def fill_cik_in_mapping():
-    cik_mappings = {}
-    n_count = 0
-    with open("scratch/ticker_cik_mapping.csv", "r") as f:
-        for line in f.readlines():
-            parts = line.split(",")
-            ticker = parts[0].strip()
-            cik = parts[1]
-            if cik:
-                cik_mappings[ticker] = str(cik)
-            else:
-                new_cik = get_mapping_from_secapi(ticker)
-                if new_cik:
-                    cik_mappings[ticker] = str(new_cik)
-                    n_count += 1
-
-    print(f"Filled {n_count} CIK mappings")
-    return cik_mappings
-
-
 if __name__ == "__main__":
-    # cik_mappings = process_fund_list()
-    cik_mappings = fill_cik_in_mapping()
-    with open("scratch/ticker_cik_mapping_2.csv", "w") as f:
+    cik_mappings = process_fund_list()
+    with open("scratch/ticker_cik_mapping.csv", "w") as f:
         for ticker, cik in cik_mappings.items():
             f.write(f"{ticker},{cik}\n")
