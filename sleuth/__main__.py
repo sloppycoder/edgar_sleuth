@@ -223,7 +223,6 @@ def main(
         return
 
     if action == "export":
-        # TODO: remove hard coded table names
         result = gather_extractin_result(
             idx_table_name=tables_map["idx"],
             extraction_result_table_name=tables_map["result"],
