@@ -2,6 +2,9 @@ import json
 import os
 
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 rated_limit_triggered = False
 
@@ -21,39 +24,39 @@ def load_mf_mapping(path: str):
 
 
 def get_mapping_from_secapi(ticker):
-    global rated_limit_triggered
+    def call_secapi(ticker, api_key):
+        global rated_limit_triggered
+
+        print(f"Getting mapping for {ticker} from SEC API")
+
+        response = requests.get(
+            f"https://api.sec-api.io/mapping/ticker/{ticker}",
+            headers={"Authorization": api_key},
+        )
+        if response.status_code == 200:
+            return response.json()
+        elif response.status_code == 429:
+            print("Rate limit triggered")
+            rated_limit_triggered = True
+            return None
+        else:
+            print(f"Failed to get mapping for {ticker}. Got {response}")
+            return None
+
+    api_key = os.getenv("SEC_API_KEY")
+    dummy_cik = "XXXX"
 
     if not ticker or len(ticker) <= 3:
         return None
 
-    dummy_cik = "XXXX"
-    if rated_limit_triggered:
+    if rated_limit_triggered or not api_key:
         return dummy_cik
 
-    api_key = os.getenv("SEC_API_KEY")
-    if not api_key:
-        return dummy_cik
+    result = call_secapi(ticker, api_key)
+    if result and len(result) > 0 and "cik" in result[0]:
+        return result[0]["cik"]
 
-    print(f"Getting mapping for {ticker} from SEC API")
-
-    response = requests.get(
-        f"https://api.sec-api.io/mapping/ticker/{ticker}",
-        headers={"Authorization": api_key},
-    )
-    if response.status_code == 200:
-        result = response.json()
-        if len(result) > 0:
-            if "cik" in result[0]:
-                return result[0]["cik"]
-            else:
-                return dummy_cik
-    elif response.status_code == 429:
-        print("Rate limit triggered")
-        rated_limit_triggered = True
-        return dummy_cik
-    else:
-        print(f"Failed to get mapping for {ticker}. Got {response}")
-        return dummy_cik
+    return dummy_cik
 
 
 def process_fund_list():
