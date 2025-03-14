@@ -8,6 +8,9 @@
 
 \pset footer off
 
+\echo master_idx_sample
+select count(*) from master_idx_sample;
+
 \echo filing_text_chunks
 select count(distinct cik) cik,
     count(distinct accession_number) filings,
