@@ -37,7 +37,7 @@ python -m sleuth extract --tag=10pct --search-tag=group1 --result-tag=batch890 -
   --table text=filing_text_chunks \
   --table embedding=filing_chunks_embeddings \
   --table search=search_phrase_embeddings \
-  --table result=trustee_comp_result \
+  --table result=trustee_comp_results \
   --model gemini
 
 # export extraction result
@@ -45,4 +45,5 @@ python -m sleuth export --tag=10pct --result-tag=batch890 \
   --table idx=master_idx_sample \
   --table text=filing_text_chunks \
   --table embedding=filing_chunks_embeddings \
-  --table result=trustee_comp_result
+  --table result=trustee_comp_results \
+  --output result.jsonl
