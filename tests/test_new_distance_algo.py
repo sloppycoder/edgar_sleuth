@@ -103,7 +103,7 @@ def get_search_phrases_embeddings() -> pd.DataFrame | None:
     return None
 
 
-def get_sample_filings() -> list[dict[str, str]]:
+def xget_sample_filings() -> list[dict[str, str]]:
     query = """
         SELECT * FROM
         (
@@ -113,21 +113,26 @@ def get_sample_filings() -> list[dict[str, str]]:
         ORDER BY random()
         LIMIT 100
     """
-    # query2 = """
-    #     SELECT distinct cik, accession_number
-    #     FROM filing_chunks_embeddings
-    # """
+    query = """
+        SELECT distinct cik, accession_number
+        FROM filing_chunks_embeddings
+    """
     result = execute_query(query)
     print(f"Total rows={len(result)}")
     return result
 
 
-def x_get_sample_filings() -> list[dict[str, str]]:
+def get_sample_filings() -> list[dict[str, str]]:
     return [
         {"cik": "275309", "accession_number": "0000275309-24-000546"},
-        {"cik": "819118", "accession_number": "0000819118-24-000143"},
         {"cik": "275309", "accession_number": "0000275309-24-000546"},
-        {"cik": "837276", "accession_number": "0001683863-24-002893"},
-        {"cik": "916053", "accession_number": "0001104659-24-009563"},
-        {"cik": "872625", "accession_number": "0001741773-24-003614"},
+        {"cik": "275309", "accession_number": "0000275309-24-000546"},
+        {"cik": "275309", "accession_number": "0000275309-24-000546"},
+        {"cik": "275309", "accession_number": "0000275309-24-000546"},
+        {"cik": "275309", "accession_number": "0000275309-24-000546"},
+        {"cik": "275309", "accession_number": "0000275309-24-000546"},
+        # {"cik": "819118", "accession_number": "0000819118-24-000143"},
+        # {"cik": "837276", "accession_number": "0001683863-24-002893"},
+        # {"cik": "916053", "accession_number": "0001104659-24-009563"},
+        # {"cik": "872625", "accession_number": "0001741773-24-003614"},
     ]
