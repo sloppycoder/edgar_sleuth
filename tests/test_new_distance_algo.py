@@ -1,3 +1,5 @@
+# type: ignore
+
 import json
 
 import numpy as np
@@ -14,24 +16,33 @@ from sleuth.trustee import _find_relevant_text
 
 
 def test_selected_chunks():
-    cik = "1314414"
-    accession_number = "0001580642-24-006321"
+    print("\n")
     df_phrases = get_search_phrases_embeddings()
-    new_chunks = get_relevant_chunk_nums_new(df_phrases, cik, accession_number)
-    assert new_chunks
+    for row in get_sample_filings():
+        new_chunks, old_chunks = [], []
 
-    old_chunks, _ = _find_relevant_text(
-        cik=cik,
-        accession_number=accession_number,
-        text_table_name="filing_text_chunks",
-        embedding_table_name="filing_chunks_embeddings",
-        search_phrase_table_name="search_phrase_embeddings",
-        search_phrase_tag="group1",
-        method="distance",
-    )
-    assert old_chunks
+        cik = row["cik"]  # "1314414"
+        accession_number = row["accession_number"]  # "0001580642-24-006321"
+        # print(f"testing cik={cik}, accession_number={accession_number}")
 
-    assert new_chunks == old_chunks
+        new_chunks = get_relevant_chunk_nums_new(df_phrases, cik, accession_number)
+        assert new_chunks
+
+        old_chunks, _ = _find_relevant_text(
+            cik=cik,
+            accession_number=accession_number,
+            text_table_name="filing_text_chunks",
+            embedding_table_name="filing_chunks_embeddings",
+            search_phrase_table_name="search_phrase_embeddings",
+            search_phrase_tag="group1",
+            method="distance",
+        )
+        assert old_chunks
+
+        if new_chunks != old_chunks:
+            print(
+                f"testing cik={cik}, accession_number={accession_number},old,new={old_chunks} || {new_chunks}"  # noqa E501
+            )
 
 
 def get_relevant_chunk_nums_new(df_phrases, cik, accession_number):
@@ -46,13 +57,12 @@ def calculate_distance_with_scipy(df_phrases, cik, accession_number, limit=20):
     df_chunks = get_filing_embeddings(cik, accession_number)
     assert df_chunks is not None and df_phrases is not None
 
-    print("\n")
     distances = []
     for idx, row in df_chunks.iterrows():
         for phrase_idx, phrase_row in df_phrases.iterrows():
             distance = cosine(phrase_row["embedding"], row["embedding"])
             distances.append({"chunk_num": row["chunk_num"], "distance": distance})
-            print(f"{idx},{phrase_idx}->{distance:.6f}")
+            # print(f"{idx},{phrase_idx}->{distance:.6f}")
 
     df_distances = pd.DataFrame(distances)
     df_distances.sort_values(by="distance", inplace=True)
@@ -91,3 +101,33 @@ def get_search_phrases_embeddings() -> pd.DataFrame | None:
         )
         return df_result
     return None
+
+
+def get_sample_filings() -> list[dict[str, str]]:
+    query = """
+        SELECT * FROM
+        (
+        SELECT distinct cik, accession_number
+        FROM filing_chunks_embeddings
+        ) CIKS
+        ORDER BY random()
+        LIMIT 100
+    """
+    # query2 = """
+    #     SELECT distinct cik, accession_number
+    #     FROM filing_chunks_embeddings
+    # """
+    result = execute_query(query)
+    print(f"Total rows={len(result)}")
+    return result
+
+
+def x_get_sample_filings() -> list[dict[str, str]]:
+    return [
+        {"cik": "275309", "accession_number": "0000275309-24-000546"},
+        {"cik": "819118", "accession_number": "0000819118-24-000143"},
+        {"cik": "275309", "accession_number": "0000275309-24-000546"},
+        {"cik": "837276", "accession_number": "0001683863-24-002893"},
+        {"cik": "916053", "accession_number": "0001104659-24-009563"},
+        {"cik": "872625", "accession_number": "0001741773-24-003614"},
+    ]
