@@ -63,7 +63,7 @@ def get_chunks(
     table_name: str,
     chunk_nums: list[int] = [],
 ) -> list[dict[str, Any]]:
-    col = "embeddings" if "embedding" in table_name else "chunk_text"
+    col = "embedding" if "embedding" in table_name else "chunk_text"
 
     query = f"""
         SELECT cik, accession_number, chunk_num, {col}
