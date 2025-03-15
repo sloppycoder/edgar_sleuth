@@ -132,6 +132,8 @@ murmurhash==1.0.11
 numpy==2.2.1
     # via
     #   blis
+    #   pandas
+    #   scipy
     #   shapely
     #   spacy
     #   thinc
@@ -144,6 +146,8 @@ packaging==24.2
     #   spacy
     #   thinc
     #   weasel
+pandas==2.2.3
+    # via edgar-sleuth (pyproject.toml)
 preshed==3.0.9
     # via
     #   spacy
@@ -183,9 +187,13 @@ pydantic-core==2.27.2
 pygments==2.19.1
     # via rich
 python-dateutil==2.9.0.post0
-    # via google-cloud-bigquery
+    # via
+    #   google-cloud-bigquery
+    #   pandas
 python-dotenv==1.0.1
     # via edgar-sleuth (pyproject.toml)
+pytz==2025.1
+    # via pandas
 regex==2024.11.6
     # via tiktoken
 requests==2.32.3
@@ -201,6 +209,8 @@ rich==13.9.4
     # via typer
 rsa==4.9
     # via google-auth
+scipy==1.15.2
+    # via edgar-sleuth (pyproject.toml)
 setuptools==75.7.0
     # via
     #   marisa-trie
@@ -255,6 +265,8 @@ typing-extensions==4.12.2
     #   pydantic
     #   pydantic-core
     #   typer
+tzdata==2025.1
+    # via pandas
 urllib3==2.3.0
     # via requests
 wasabi==1.1.3
