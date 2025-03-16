@@ -14,7 +14,7 @@ python -m sleuth load-index "2024/*"
 psql <database> -f sql/sample.sql
 
 # chunk
-python -m sleuth chunk --tag=10pct  --workers=6  \
+python -m sleuth chunk --tag=10pct  --workers=8  \
   --table idx=master_idx_sample \
   --table text=filing_text_chunks
 
